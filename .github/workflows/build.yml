@@ -1,0 +1,66 @@
+name: Build WristBrowser APK and RPK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  android:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+      - name: Download original Xiaomi XMS SDK
+        run: |
+          set -euo pipefail
+          mkdir -p phone/libs
+          curl --fail --location --retry 3 \
+            https://raw.githubusercontent.com/open-vela/packages_apps/dev/wearable/interconnect_image_demo/android_program/libs/xms-wearable-lib_1.4_release.aar \
+            --output phone/libs/xms-wearable-lib_1.4_release.aar
+          test -s phone/libs/xms-wearable-lib_1.4_release.aar
+      - name: Build debug APK
+        run: gradle :phone:assembleDebug --stacktrace
+      - uses: actions/upload-artifact@v4
+        with:
+          name: WristBrowser-Android-APK
+          path: phone/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+
+  vela:
+    name: Build Xiaomi Vela RPK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '20'
+      - name: Install Vela dependencies
+        working-directory: watch
+        run: npm install --no-audit --no-fund
+      - name: Build Vela app
+        working-directory: watch
+        run: npm run build
+      - name: Verify and stage RPK
+        run: |
+          set -euo pipefail
+          find watch/dist -type f -name '*.rpk' -print
+          RPK="$(find watch/dist -type f -name '*.rpk' -print -quit)"
+          test -n "$RPK"
+          mkdir -p watch/artifacts
+          cp "$RPK" watch/artifacts/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: WristBrowser-Xiaomi-Vela-RPK
+          path: watch/artifacts/*.rpk
+          if-no-files-found: error
