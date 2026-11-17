@@ -37,9 +37,10 @@ class WearableBridge(context: Context) {
             .put("url", page.url).put("title", page.title).put("chunks", chunks.size)
             .toString()
         status("Подготовлено частей: ${chunks.size}")
-        sendPayload(target.id, start) {
-            sendPart(target.id, transferId, chunks, 0, status)
-        } onFailure@{ error -> status("Не удалось начать передачу: $error") }
+        sendPayload(target.id, start,
+            { sendPart(target.id, transferId, chunks, 0, status) },
+            { error -> status("Не удалось начать передачу: $error") }
+        )
     }
 
     private fun sendPart(id: String, transferId: String, chunks: List<String>, index: Int, status: (String) -> Unit) {
