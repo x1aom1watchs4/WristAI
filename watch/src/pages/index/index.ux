@@ -1,0 +1,136 @@
+<template>
+  <div class="page">
+    <text class="brand">WristBrowser</text>
+    <text class="status">{{status}}</text>
+    <text class="heading">{{pageTitle}}</text>
+    <scroll class="reader">
+      <text class="body">{{pageText}}</text>
+    </scroll>
+    <input type="button" class="button" value="Проверить связь" @click="checkConnection" />
+  </div>
+</template>
+
+<script>
+import interconnect from '@system.interconnect'
+import file from '@system.file'
+
+let connection = null
+export default {
+  private: {
+    status: 'Ожидание телефона',
+    pageTitle: 'Открой сайт на телефоне',
+    pageText: 'WristBrowser получает упрощённый текст веб-страниц через приложение на телефоне.',
+    transferId: '',
+    expected: 0,
+    chunks: [],
+    receivedCount: 0
+  },
+  onInit() {
+    this.bindConnection()
+  },
+  bindConnection() {
+    try {
+      connection = interconnect.instance()
+      connection.onopen = () => { this.status = 'Телефон подключён' }
+      connection.onclose = () => { this.status = 'Связь прервана' }
+      connection.onerror = (e) => { this.status = 'Ошибка связи: ' + (e && e.code !== undefined ? e.code : 'неизвестно') }
+      connection.onmessage = (event) => {
+        this.handleMessage(event && event.data !== undefined ? event.data : '')
+      }
+      this.checkConnection()
+    } catch (e) {
+      this.status = 'Ошибка запуска связи'
+    }
+  },
+  checkConnection() {
+    try {
+      if (!connection) connection = interconnect.instance()
+      connection.diagnosis({
+        timeout: 10000,
+        success: (result) => {
+          this.status = result && result.status === 0 ? 'Телефон подключён' : 'Телефон не найден'
+        },
+        fail: () => { this.status = 'Не удалось проверить связь' }
+      })
+    } catch (e) {
+      this.status = 'Ошибка проверки связи'
+    }
+  },
+  handleMessage(raw) {
+    let msg
+    try {
+      msg = typeof raw === 'string' ? JSON.parse(raw) : raw
+    } catch (e) {
+      this.status = 'Повреждённое сообщение'
+      return
+    }
+    if (!msg || msg.protocol !== 1 || !msg.type || !msg.id) return
+
+    if (msg.type === 'page_start') {
+      if (!Number.isInteger(msg.chunks) || msg.chunks < 1 || msg.chunks > 256) {
+        this.status = 'Некорректный размер страницы'
+        return
+      }
+      this.transferId = msg.id
+      this.expected = msg.chunks
+      this.chunks = []
+      this.receivedCount = 0
+      this.pageTitle = typeof msg.title === 'string' ? msg.title.slice(0, 160) : 'Веб-страница'
+      this.pageText = ''
+      this.status = 'Получаю страницу: 0/' + this.expected
+      return
+    }
+
+    if (msg.id !== this.transferId) return
+    if (msg.type === 'page_chunk') {
+      if (!Number.isInteger(msg.index) || msg.index < 0 || msg.index >= this.expected || typeof msg.text !== 'string') {
+        this.status = 'Некорректная часть страницы'
+        return
+      }
+      if (this.chunks[msg.index] === undefined) this.receivedCount++
+      this.chunks[msg.index] = msg.text
+      this.status = 'Получено: ' + this.receivedCount + '/' + this.expected
+      return
+    }
+
+    if (msg.type === 'page_end') {
+      if (this.receivedCount !== this.expected) {
+        this.status = 'Страница неполная: ' + this.receivedCount + '/' + this.expected
+        return
+      }
+      let complete = ''
+      for (let i = 0; i < this.expected; i++) {
+        if (typeof this.chunks[i] !== 'string') {
+          this.status = 'Не хватает части ' + (i + 1)
+          return
+        }
+        complete += this.chunks[i]
+      }
+      this.pageText = complete
+      file.writeText({
+        uri: 'internal://files/wristbrowser-page.txt',
+        text: complete,
+        encoding: 'UTF-8',
+        success: () => { this.status = 'Страница получена и сохранена' },
+        fail: (e, code) => { this.status = 'Ошибка сохранения: ' + code }
+      })
+    }
+  }
+}
+</script>
+
+<style>
+.page {
+  width: 466px;
+  height: 466px;
+  flex-direction: column;
+  padding: 24px;
+  background-color: #101820;
+}
+.brand { color: #8ed6c5; font-size: 24px; font-weight: bold; margin-bottom: 8px; }
+.status { color: #9aa7b2; font-size: 16px; margin-bottom: 10px; }
+.heading { color: #ffffff; font-size: 23px; font-weight: bold; margin-bottom: 8px; }
+.reader { width: 418px; height: 270px; }
+.body { color: #e2e8ed; font-size: 18px; line-height: 1.4; }
+.button { width: 260px; height: 48px; color: #101820; background-color: #8ed6c5; font-size: 18px; margin-top: 8px; }
+</style>
