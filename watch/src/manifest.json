@@ -4,15 +4,31 @@
   "versionName": "0.1.0",
   "versionCode": 1,
   "minPlatformVersion": 1000,
-  "deviceTypeList": ["watch"],
-  "features": [
-    { "name": "system.router" },
-    { "name": "system.interconnect" },
-    { "name": "system.file" }
+  "deviceTypeList": [
+    "watch"
   ],
-  "config": { "logLevel": "info", "designWidth": 466 },
+  "features": [
+    {
+      "name": "system.router"
+    },
+    {
+      "name": "system.interconnect"
+    },
+    {
+      "name": "system.file"
+    }
+  ],
+  "config": {
+    "logLevel": "info",
+    "designWidth": 466
+  },
   "router": {
     "entry": "pages/index",
-    "pages": { "pages/index": { "component": "index" } }
-  }
+    "pages": {
+      "pages/index": {
+        "component": "index"
+      }
+    }
+  },
+  "icon": "/common/wristbrowser-icon.svg"
 }
