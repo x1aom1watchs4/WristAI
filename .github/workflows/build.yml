@@ -48,19 +48,69 @@ jobs:
       - name: Install Vela dependencies
         working-directory: watch
         run: npm install --no-audit --no-fund
-      - name: Build Vela app
+      - name: Build Xiaomi Vela debug RPK
         working-directory: watch
         run: npm run build
-      - name: Verify and stage RPK
+      - name: Verify and stage debug RPK
+        working-directory: watch
         run: |
           set -euo pipefail
-          find watch/dist -type f -name '*.rpk' -print
-          RPK="$(find watch/dist -type f -name '*.rpk' -print -quit)"
+          find "$GITHUB_WORKSPACE/watch/dist" -type f -name '*.rpk' -print
+          RPK="$(find "$GITHUB_WORKSPACE/watch/dist" -type f -name '*.debug.*.rpk' -print -quit)"
           test -n "$RPK"
-          mkdir -p watch/artifacts
-          cp "$RPK" watch/artifacts/
-      - uses: actions/upload-artifact@v4
+          mkdir -p "$GITHUB_WORKSPACE/watch/artifacts"
+          cp "$RPK" "$GITHUB_WORKSPACE/watch/artifacts/"
+      - name: Upload Xiaomi Watch debug RPK
+        uses: actions/upload-artifact@v4
         with:
-          name: WristBrowser-Xiaomi-Vela-RPK
-          path: watch/artifacts/*.rpk
+          name: WristBrowser-Xiaomi-Vela-Debug-RPK
+          path: watch/artifacts/*.debug.*.rpk
           if-no-files-found: error
+      - name: Configure Vela signing certificate
+        id: signing
+        working-directory: watch
+        env:
+          VELA_PRIVATE_KEY: ${{ secrets.VELA_PRIVATE_KEY }}
+          VELA_CERTIFICATE: ${{ secrets.VELA_CERTIFICATE }}
+        run: |
+          set -euo pipefail
+          if [ -z "$VELA_PRIVATE_KEY" ] || [ -z "$VELA_CERTIFICATE" ]; then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "Release signing secrets are not configured; skipping release build."
+            exit 0
+          fi
+          mkdir -p sign
+          printf '%s\\n' "$VELA_PRIVATE_KEY" > sign/private.pem
+          printf '%s\\n' "$VELA_CERTIFICATE" > sign/certificate.pem
+          openssl pkey -in sign/private.pem -check -noout
+          openssl x509 -in sign/certificate.pem -noout -subject -dates
+          KEY_HASH="$(openssl pkey -in sign/private.pem -pubout -outform DER | sha256sum | cut -d' ' -f1)"
+          CERT_HASH="$(openssl x509 -in sign/certificate.pem -pubkey -noout | openssl pkey -pubin -outform DER | sha256sum | cut -d' ' -f1)"
+          test "$KEY_HASH" = "$CERT_HASH"
+          echo "ready=true" >> "$GITHUB_OUTPUT"
+      - name: Build Xiaomi Vela release RPK
+        if: steps.signing.outputs.ready == 'true'
+        working-directory: watch
+        run: npm run release
+      - name: Verify and stage release RPK
+        if: steps.signing.outputs.ready == 'true'
+        working-directory: watch
+        run: |
+          set -euo pipefail
+          find "$GITHUB_WORKSPACE/watch/dist" -type f -name '*.rpk' -print
+          RPK="$(find "$GITHUB_WORKSPACE/watch/dist" -type f -name '*.release.*.rpk' -print -quit)"
+          test -n "$RPK"
+          mkdir -p "$GITHUB_WORKSPACE/watch/artifacts"
+          cp "$RPK" "$GITHUB_WORKSPACE/watch/artifacts/"
+      - name: Upload Xiaomi Watch release RPK
+        if: steps.signing.outputs.ready == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: WristBrowser-Xiaomi-Vela-Release-RPK
+          path: watch/artifacts/*.release.*.rpk
+          if-no-files-found: error
+      - name: Explain missing release signing secrets
+        if: steps.signing.outputs.ready != 'true'
+        run: |
+          echo 'Release RPK was not built: configure repository Actions secrets VELA_PRIVATE_KEY and VELA_CERTIFICATE.'
+          echo 'The debug RPK was built and uploaded separately.'
