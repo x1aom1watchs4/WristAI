@@ -20,12 +20,24 @@ object PageLoader {
         }
         try {
             connection.connect()
+            require(connection.url.protocol == "https") { "Перенаправление на HTTP запрещено" }
             require(connection.responseCode in 200..299) { "Сайт ответил: HTTP ${connection.responseCode}" }
             val type = connection.contentType.orEmpty()
             require(type.contains("text/html", true) || type.contains("application/xhtml", true)) {
                 "Этот тип страницы пока не поддерживается"
             }
-            val html = connection.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText().take(1_500_000) }
+            val html = connection.inputStream.bufferedReader(Charsets.UTF_8).use { reader ->
+                val out = StringBuilder()
+                val buffer = CharArray(8192)
+                var total = 0
+                while (total < 1_500_000) {
+                    val count = reader.read(buffer, 0, minOf(buffer.size, 1_500_000 - total))
+                    if (count < 0) break
+                    out.append(buffer, 0, count)
+                    total += count
+                }
+                out.toString()
+            }
             val title = Regex("(?is)<title[^>]*>(.*?)</title>").find(html)?.groupValues?.get(1)
                 ?.replace(Regex("<[^>]+>"), " ")?.let { Html.fromHtml(it, Html.FROM_HTML_MODE_COMPACT).toString().trim() }
                 .orEmpty().ifBlank { uri.host ?: "Страница" }
