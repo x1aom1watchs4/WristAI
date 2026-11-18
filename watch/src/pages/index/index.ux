@@ -125,7 +125,7 @@ export default {
       this.status = 'Получаем страницу…'
     } else if (message.type === 'page_chunk') {
       if (message.id !== this.transferId) return
-      this.chunks[Number(message.index)] = message.text || ''
+      this.chunks[Number(message.index)] = this.base64ToUtf8(message.textBase64 || '')
       this.received++
       this.status = 'Загрузка страницы: ' + this.received + '/' + this.expectedChunks
     } else if (message.type === 'page_end') {
