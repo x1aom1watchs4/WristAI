@@ -93,12 +93,14 @@ export default {
     this.sendCommand('scroll', { delta: 320 })
   },
   onImageComplete(event) {
-    this.status = 'Image ready'
-    this.sendCommand('browser_image_ack', { id: this.transferId, ok: true })
+    const width = event && event.width ? event.width : 0
+    const height = event && event.height ? event.height : 0
+    this.status = width && height ? 'Image displayed ' + width + 'x' + height : 'Image displayed'
+    this.sendCommand('browser_image_ack', { id: this.transferId, ok: true, width: width, height: height })
   },
   onImageError() {
-    this.status = 'Image decode error'
-    this.sendCommand('browser_image_ack', { id: this.transferId, ok: false, error: 'image decode failed' })
+    this.status = 'Image display failed'
+    this.sendCommand('browser_image_ack', { id: this.transferId, ok: false, error: 'image component could not load local file' })
   },
   tapImage(event) {
     const x = event && event.pageX !== undefined ? Math.round((event.pageX - 83) * 418 / 300) : 209
@@ -164,7 +166,8 @@ export default {
       this.receivedCount = 0
       this.imageTitle = typeof msg.title === 'string' ? msg.title.slice(0, 120) : 'Web page'
       this.pageTitle = this.imageTitle
-      this.status = 'IMAGE START 0/' + this.expected
+      this.imageData = ''
+      this.status = 'Receiving image 0/' + this.expected
       return
     }
 
@@ -201,20 +204,43 @@ export default {
       }
       try {
         const buffer = this.base64ToArrayBuffer(encoded)
+        this.chunks = []
+        if (buffer.length < 4 || buffer[0] !== 255 || buffer[1] !== 216) {
+          this.status = 'Invalid JPEG data'
+          this.sendCommand('browser_image_ack', { id: this.transferId, ok: false, error: 'invalid JPEG data' })
+          return
+        }
+        const uri = 'internal://cache/wristbrowser-' + this.transferId + '.jpg'
+        this.status = 'Saving image (' + buffer.length + ' bytes)'
         file.writeArrayBuffer({
-          uri: 'internal://files/wristbrowser-screen.jpg',
+          uri: uri,
           buffer: buffer,
           success: () => {
-            this.imageData = 'internal://files/wristbrowser-screen.jpg'
-            this.status = 'Opening image...'
+            file.get({
+              uri: uri,
+              success: (info) => {
+                if (!info || !info.length) {
+                  this.status = 'Saved image is empty'
+                  this.sendCommand('browser_image_ack', { id: this.transferId, ok: false, error: 'saved image is empty' })
+                  return
+                }
+                this.imageData = uri
+                this.status = 'Loading image (' + info.length + ' bytes)'
+              },
+              fail: (e, code) => {
+                this.status = 'Image check failed: ' + code
+                this.sendCommand('browser_image_ack', { id: this.transferId, ok: false, error: 'file check ' + String(code || 'failed') })
+              }
+            })
           },
           fail: (e, code) => {
             this.status = 'Image save error: ' + code
-            this.sendCommand('browser_image_ack', { id: this.transferId, ok: false, error: String(code || 'error файла') })
+            this.sendCommand('browser_image_ack', { id: this.transferId, ok: false, error: String(code || 'file write failed') })
           }
         })
       } catch (e) {
-        this.status = 'Image decode error'
+        this.status = 'Image processing error'
+        this.sendCommand('browser_image_ack', { id: this.transferId, ok: false, error: 'image processing exception' })
       }
       return
     }
