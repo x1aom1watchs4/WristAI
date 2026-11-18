@@ -80,7 +80,7 @@ jobs:
           test -n "$SDK_ROOT"
           APKSIGNER="$(find "$SDK_ROOT/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
           test -x "$APKSIGNER"
-          ACTUAL="$("$APKSIGNER" verify --print-certs "$APK" | awk -F': ' '/certificate SHA-256 digest:/ {print $2}' | tr -d ':' | tr '[:upper:]' '[:lower:]')"
+          ACTUAL="$("$APKSIGNER" verify --print-certs "$APK" | awk 'tolower($0) ~ /certificate sha-256 digest/ { sub(/^.*digest[^0-9a-fA-F]*/, ""); print; exit }' | tr -d ':' | tr '[:upper:]' '[:lower:]')"
           test -n "$ACTUAL"
           if [ "$EXPECTED" != "$ACTUAL" ]; then
             echo "APK certificate fingerprint does not match the Vela certificate."
