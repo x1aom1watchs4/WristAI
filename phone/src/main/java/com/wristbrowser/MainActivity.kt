@@ -56,7 +56,7 @@ class MainActivity : ComponentActivity() {
                             pageData.optString("url", view.url ?: ""),
                             pageData.optString("title", view.title ?: "Web page"),
                             pageData.optString("text", "") +
-                                "\\n\\n__WRIST_LINKS__\\n" +
+                                "\n\n__WRIST_LINKS__\n" +
                                 (pageData.optJSONArray("links")?.toString() ?: "[]")
                         )
                         if (page.text.isBlank()) throw IllegalStateException("No readable page text")
