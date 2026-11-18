@@ -4,11 +4,11 @@
     <text class="status">{{status}}</text>
     <div class="searchRow">
       <input class="query" type="text" value="{{query}}" placeholder="Search Google..." @change="onQueryChange" />
-      <input type="button" class="searchButton" value="PHONE" @click="search" />
+      <input type="button" class="searchButton" value="Go" @click="search" />
     </div>
     <div class="controls">
-      <input type="button" class="smallButton" value="DIRECT" @click="directSearch" />
-      <input type="button" class="smallButton" value="NET TEST" @click="testNetwork" />
+      <input type="button" class="smallButton" value="UP" @click="scrollUp" />
+      <input type="button" class="smallButton" value="DOWN" @click="scrollDown" />
       <input type="button" class="smallButton" value="CONNECT" @click="checkConnection" />
     </div>
     <div class="controls navControls">
@@ -27,7 +27,6 @@
 <script>
 import interconnect from '@system.interconnect'
 import file from '@system.file'
-import fetch from '@system.fetch'
 
 let connection = null
 let connectionOpened = false
@@ -44,8 +43,7 @@ export default {
     imageData: '',
     imageTitle: '',
     touchStartX: -1,
-    touchStartY: -1,
-    directLoading: false
+    touchStartY: -1
   },
   onInit() {
     this.bindConnection()
@@ -83,76 +81,6 @@ export default {
   },
   onQueryChange(event) {
     this.query = event && event.value !== undefined ? event.value : this.query
-  },
-  testNetwork() {
-    this.status = 'Checking phone Bluetooth internet...'
-    fetch.fetch({
-      url: 'https://www.google.com/generate_204',
-      method: 'GET',
-      responseType: 'text',
-      success: (response) => {
-        this.status = response && response.code >= 200 && response.code < 400
-          ? 'Internet via phone: OK (' + response.code + ')'
-          : 'Network response: ' + (response ? response.code : 'unknown')
-      },
-      fail: (error, code) => {
-        this.status = 'Network unavailable: ' + String(code || (error && error.message) || 'request failed')
-      }
-    })
-  },
-  directSearch() {
-    const value = (this.query || '').trim()
-    if (!value) {
-      this.status = 'Enter a search first'
-      return
-    }
-    if (this.directLoading) return
-    this.directLoading = true
-    this.imageData = ''
-    this.pageTitle = 'Google: ' + value
-    this.pageText = 'Loading search results directly on the watch...'
-    this.status = 'Searching over phone Bluetooth internet...'
-    const url = 'https://www.google.com/search?igu=1&gbv=1&q=' + encodeURIComponent(value)
-    fetch.fetch({
-      url: url,
-      method: 'GET',
-      responseType: 'text',
-      header: {
-        'Accept': 'text/html,application/xhtml+xml',
-        'Accept-Language': 'en-US,en;q=0.8'
-      },
-      success: (response) => {
-        this.directLoading = false
-        const html = response && response.data ? String(response.data) : ''
-        if (!html || response.code < 200 || response.code >= 400) {
-          this.status = 'Google request failed: ' + (response ? response.code : 'empty response')
-          return
-        }
-        const clean = html
-          .replace(/<script[\s\S]*?<\/script>/gi, ' ')
-          .replace(/<style[\s\S]*?<\/style>/gi, ' ')
-          .replace(/<br\s*\/?\s*>/gi, '\n')
-          .replace(/<\/(p|div|li|h[1-6])>/gi, '\n')
-          .replace(/<[^>]+>/g, ' ')
-          .replace(/&nbsp;/g, ' ')
-          .replace(/&amp;/g, '&')
-          .replace(/&quot;/g, '"')
-          .replace(/&#39;/g, "'")
-          .replace(/&lt;/g, '<')
-          .replace(/&gt;/g, '>')
-          .replace(/[ \t]+/g, ' ')
-          .replace(/\n[ \t]+/g, '\n')
-          .replace(/\n{3,}/g, '\n\n')
-          .trim()
-        this.pageText = clean.slice(0, 9000) || 'Google returned no readable text. Try PHONE mode.'
-        this.status = 'Direct results loaded (' + response.code + ')'
-      },
-      fail: (error, code) => {
-        this.directLoading = false
-        this.status = 'Direct search failed: ' + String(code || (error && error.message) || 'network error')
-        this.pageText = 'The watch could not load Google directly. Check that the phone is connected and has internet, then try PHONE mode.'
-      }
-    })
   },
   search() {
     const value = (this.query || '').trim()
