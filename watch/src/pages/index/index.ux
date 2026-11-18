@@ -190,6 +190,20 @@ export default {
     }
   },
 
+  base64ToUtf8(base64) {
+    const bytes = this.base64ToUint8Array(base64)
+    let encoded = ''
+    for (let i = 0; i < bytes.length; i++) {
+      encoded += '%' + ('0' + bytes[i].toString(16)).slice(-2)
+    }
+    try {
+      return decodeURIComponent(encoded)
+    } catch (error) {
+      this.status = 'Ошибка декодирования текста UTF-8'
+      return ''
+    }
+  },
+
   base64ToUint8Array(base64) {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
     const len = base64.length
