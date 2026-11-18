@@ -147,7 +147,7 @@ class MainActivity : ComponentActivity() {
                                     val delta = command.optInt("delta", 300).coerceIn(-1200, 1200)
                                     val view = browserView
                                     if (view != null && pageReady && !pageLoading) {
-                                        view.evaluateJavascript("window.scrollBy({top:$delta,left:0,behavior:'instant'})", null)
+                                        view.evaluateJavascript("window.scrollBy(0,$delta)", null)
                                         mainHandler.postDelayed({
                                             if (pageReady && !pageLoading) browserView?.let { captureAndSend(it) }
                                         }, 250)
