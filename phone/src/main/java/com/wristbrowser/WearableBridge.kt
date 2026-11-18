@@ -54,7 +54,7 @@ class WearableBridge(context: Context) {
         }
         val image = images[imageIndex]
         val encoded = Base64.encodeToString(image.jpeg, Base64.NO_WRAP)
-        val chunks = encoded.chunked(2400)
+        val chunks = encoded.chunked(900)
         val transferId = UUID.randomUUID().toString()
         val start = JSONObject().put("protocol", 1).put("type", "browser_image_start")
             .put("id", transferId).put("title", image.title.take(120))
@@ -86,7 +86,7 @@ class WearableBridge(context: Context) {
             .put("id", transferId).put("index", index).put("data", chunks[index]).toString()
         sendPayload(nodeId, payload, {
             status("Image ${imageIndex + 1}/${images.size}: ${index + 1}/${chunks.size}")
-            sendImagePart(nodeId, transferId, chunks, index + 1, imageIndex, images, status)
+            Handler(Looper.getMainLooper()).postDelayed({ sendImagePart(nodeId, transferId, chunks, index + 1, imageIndex, images, status) }, 35)
         }, { status("Image chunk error ${index + 1}: $it") })
     }
 
@@ -194,7 +194,7 @@ class WearableBridge(context: Context) {
 
     private fun transferPage(target: Node, page: WebPage, images: List<PageImage>, status: (String) -> Unit) {
         val transferId = UUID.randomUUID().toString()
-        val chunks = splitUtf16Safely(page.text, 900)
+        val chunks = splitUtf8Safely(page.text, 1200).map { Base64.encodeToString(it.toByteArray(StandardCharsets.UTF_8), Base64.NO_WRAP) }
         val start = JSONObject().put("protocol", 1).put("type", "page_start").put("id", transferId)
             .put("url", page.url).put("title", page.title).put("chunks", chunks.size).toString()
         status("Chunks prepared: ${chunks.size}")
@@ -219,7 +219,7 @@ class WearableBridge(context: Context) {
             return
         }
         val payload = JSONObject().put("protocol", 1).put("type", "page_chunk")
-            .put("id", transferId).put("index", index).put("text", chunks[index]).toString()
+            .put("id", transferId).put("index", index).put("textBase64", chunks[index]).toString()
         sendPayload(id, payload, {
             status("Sending: ${index + 1}/${chunks.size}")
             sendPart(id, transferId, chunks, index + 1, images, status)
@@ -236,15 +236,22 @@ class WearableBridge(context: Context) {
         }
     }
 
-    private fun splitUtf16Safely(value: String, max: Int): List<String> {
+    private fun splitUtf8Safely(value: String, maxBytes: Int): List<String> {
         val result = mutableListOf<String>()
-        var start = 0
-        while (start < value.length) {
-            var end = minOf(start + max, value.length)
-            if (end < value.length && Character.isHighSurrogate(value[end - 1]) && Character.isLowSurrogate(value[end])) end--
-            result += value.substring(start, end)
-            start = end
+        var current = StringBuilder()
+        var bytes = 0
+        value.codePoints().forEach { codePoint ->
+            val part = String(Character.toChars(codePoint))
+            val size = part.toByteArray(StandardCharsets.UTF_8).size
+            if (bytes + size > maxBytes && current.isNotEmpty()) {
+                result += current.toString()
+                current = StringBuilder()
+                bytes = 0
+            }
+            current.append(part)
+            bytes += size
         }
+        if (current.isNotEmpty()) result += current.toString()
         return result.ifEmpty { listOf("") }
     }
 }
