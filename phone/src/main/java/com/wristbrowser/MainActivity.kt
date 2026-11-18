@@ -15,14 +15,13 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.io.ByteArrayOutputStream
 
@@ -32,49 +31,63 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            val scope = rememberCoroutineScope()
             val bridge = remember { WearableBridge(applicationContext) }
             var address by remember { mutableStateOf("https://example.com") }
-            var page by remember { mutableStateOf<WebPage?>(null) }
-            var status by remember { mutableStateOf("Checking watch connection...") }
-            var busy by remember { mutableStateOf(false) }
+            var status by remember { mutableStateOf("Connecting to watch...") }
             var browserView by remember { mutableStateOf<WebView?>(null) }
+            var pageLoading by remember { mutableStateOf(false) }
+            var pageReady by remember { mutableStateOf(false) }
+            var pageProgress by remember { mutableIntStateOf(0) }
 
             fun captureAndSend(view: WebView) {
                 mainHandler.postDelayed({
                     try {
+                        if (view.width <= 0 || view.height <= 0) {
+                            status = "Preview is not ready yet. Open the page again."
+                            return@postDelayed
+                        }
                         val width = 418
                         val height = 260
                         val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.RGB_565)
                         val canvas = Canvas(bitmap)
-                        val sx = width.toFloat() / view.width.coerceAtLeast(1)
-                        val sy = height.toFloat() / view.height.coerceAtLeast(1)
-                        canvas.scale(sx, sy)
+                        canvas.scale(
+                            width.toFloat() / view.width.coerceAtLeast(1),
+                            height.toFloat() / view.height.coerceAtLeast(1)
+                        )
                         view.draw(canvas)
                         val output = ByteArrayOutputStream()
-                        bitmap.compress(Bitmap.CompressFormat.JPEG, 45, output)
+                        bitmap.compress(Bitmap.CompressFormat.JPEG, 55, output)
                         bitmap.recycle()
-                        bridge.sendBrowserImage(view.title?.ifBlank { view.url ?: "Web page" } ?: "Web page", output.toByteArray()) {
-                            status = it
-                        }
+                        bridge.sendBrowserImage(
+                            view.title?.ifBlank { view.url ?: "Web page" } ?: "Web page",
+                            output.toByteArray()
+                        ) { message -> status = message }
                     } catch (e: Exception) {
-                        status = "Could not capture page: ${e.message ?: "error"}"
+                        status = "Could not capture preview: ${e.message ?: "error"}"
                     }
-                }, 650)
+                }, 350)
             }
 
             fun openBrowserUrl(raw: String) {
                 val target = raw.trim()
                 if (target.isBlank()) return
-                val url = if (target.startsWith("https://", true)) target else if (target.contains(" ") || !target.contains(".")) {
-                    "https://www.google.com/search?q=" + Uri.encode(target)
-                } else "https://$target"
-                if (!url.startsWith("https://")) {
-                    status = "Only HTTPS pages are supported"
+                if (target.startsWith("http://", true)) {
+                    status = "Please use a secure HTTPS address."
                     return
                 }
+                val url = when {
+                    target.startsWith("https://", true) -> target
+                    target.contains(" ") || !target.contains(".") ->
+                        "https://www.google.com/search?q=" + Uri.encode(target)
+                    else -> "https://$target"
+                }
                 browserView?.loadUrl(url)
-                status = "Opening: $url"
+                if (browserView == null) {
+                    status = "Browser preview is starting. Tap Open again in a moment."
+                } else {
+                    pageReady = false
+                    status = "Opening page..."
+                }
             }
 
             LaunchedEffect(Unit) {
@@ -85,14 +98,17 @@ class MainActivity : ComponentActivity() {
                             when (command.optString("type")) {
                                 "browser_image_ack" -> {
                                     status = if (command.optBoolean("ok", false)) {
-                                        "Watch confirmed: image saved and displayed."
+                                        "Watch confirmed: preview received and displayed."
                                     } else {
-                                        "Watch could not save image: " + command.optString("error", "неизвестная error")
+                                        "Watch could not display image: " + command.optString("error", "unknown error")
                                     }
                                 }
                                 "search" -> {
                                     val query = command.optString("query").take(300)
-                                    if (query.isNotBlank()) openBrowserUrl(query)
+                                    if (query.isNotBlank()) {
+                                        address = query
+                                        openBrowserUrl(query)
+                                    }
                                 }
                                 "tap" -> {
                                     val x = command.optDouble("x", -1.0).toInt().coerceIn(0, 465)
@@ -110,7 +126,7 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
                         } catch (_: Exception) {
-                            status = "Could not process command from watch"
+                            status = "Could not process command from watch."
                         }
                     }
                 }
@@ -120,65 +136,120 @@ class MainActivity : ComponentActivity() {
             MaterialTheme {
                 Scaffold { padding ->
                     Column(
-                        Modifier.fillMaxSize().padding(padding).padding(18.dp)
-                            .verticalScroll(rememberScrollState()),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                        Modifier.fillMaxSize()
+                            .padding(padding)
+                            .verticalScroll(rememberScrollState())
+                            .padding(horizontal = 18.dp, vertical = 16.dp),
+                        verticalArrangement = Arrangement.spacedBy(14.dp)
                     ) {
                         Text("WristBrowser", style = MaterialTheme.typography.headlineMedium)
-                        Text("Search and web pages on Xiaomi Watch S4")
+                        Text(
+                            "Open a website here and preview exactly what is sent to your Xiaomi Watch S4.",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+
                         OutlinedTextField(
-                            value = address, onValueChange = { address = it },
-                            label = { Text("Website or search query") }, singleLine = true,
+                            value = address,
+                            onValueChange = { address = it },
+                            label = { Text("Website or search") },
+                            placeholder = { Text("google.com") },
+                            singleLine = true,
                             modifier = Modifier.fillMaxWidth()
                         )
-                        Button(
-                            enabled = address.isNotBlank(),
-                            onClick = { openBrowserUrl(address) },
-                            modifier = Modifier.fillMaxWidth()
-                        ) { Text("Open on watch") }
-                        AndroidView(
-                            modifier = Modifier.fillMaxWidth().height(300.dp),
-                            factory = { context ->
-                                WebView(context).apply {
-                                    settings.javaScriptEnabled = true
-                                    settings.domStorageEnabled = true
-                                    settings.allowFileAccess = false
-                                    settings.allowContentAccess = false
-                                    settings.javaScriptCanOpenWindowsAutomatically = false
-                                    webChromeClient = WebChromeClient()
-                                    webViewClient = object : WebViewClient() {
-                                        override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
-                                            return request.url.scheme != "https"
-                                        }
-                                        override fun onPageFinished(view: WebView, url: String) {
-                                            status = "Page ready: ${view.title}"
-                                            captureAndSend(view)
-                                        }
-                                    }
-                                    browserView = this
-                                }
-                            },
-                            update = { browserView = it }
-                        )
-                        Text(status, style = MaterialTheme.typography.bodyMedium)
-                        Text("Page snapshots are sent to the watch. Taps and scrolling on the watch control this page.")
-                        page?.let { loaded ->
-                            HorizontalDivider()
-                            Text(loaded.title, style = MaterialTheme.typography.titleLarge)
-                            Text(loaded.url, style = MaterialTheme.typography.labelSmall)
-                            Text(loaded.text.take(4500), style = MaterialTheme.typography.bodyMedium)
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
                             Button(
-                                enabled = !busy,
-                                onClick = {
-                                    busy = true
-                                    bridge.send(loaded) { message ->
-                                        status = message
-                                        if (message.startsWith("Данные переданы") || message.startsWith("Ошибка")) busy = false
-                                    }
-                                },
-                                modifier = Modifier.fillMaxWidth()
-                            ) { Text("Send text version") }
+                                onClick = { openBrowserUrl(address) },
+                                enabled = address.isNotBlank(),
+                                modifier = Modifier.weight(1f)
+                            ) { Text("Open") }
+
+                            OutlinedButton(
+                                onClick = { browserView?.let { captureAndSend(it) } },
+                                enabled = pageReady && !pageLoading && browserView != null,
+                                modifier = Modifier.weight(1f)
+                            ) { Text("Send to Watch") }
                         }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text("WATCH PREVIEW", style = MaterialTheme.typography.labelLarge)
+                            Text("418 × 260", style = MaterialTheme.typography.labelSmall)
+                        }
+
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(18.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier.fillMaxWidth()
+                                    .aspectRatio(418f / 260f)
+                                    .clip(RoundedCornerShape(18.dp))
+                            ) {
+                                AndroidView(
+                                    modifier = Modifier.fillMaxSize(),
+                                    factory = { context ->
+                                        WebView(context).apply {
+                                            settings.javaScriptEnabled = true
+                                            settings.domStorageEnabled = true
+                                            settings.allowFileAccess = false
+                                            settings.allowContentAccess = false
+                                            settings.javaScriptCanOpenWindowsAutomatically = false
+                                            webChromeClient = object : WebChromeClient() {
+                                                override fun onProgressChanged(view: WebView, newProgress: Int) {
+                                                    pageProgress = newProgress
+                                                }
+                                            }
+                                            webViewClient = object : WebViewClient() {
+                                                override fun shouldOverrideUrlLoading(
+                                                    view: WebView,
+                                                    request: WebResourceRequest
+                                                ): Boolean = request.url.scheme != "https"
+
+                                                override fun onPageStarted(
+                                                    view: WebView,
+                                                    url: String,
+                                                    favicon: Bitmap?
+                                                ) {
+                                                    pageLoading = true
+                                                    pageReady = false
+                                                    status = "Loading page..."
+                                                }
+
+                                                override fun onPageFinished(view: WebView, url: String) {
+                                                    pageLoading = false
+                                                    pageReady = true
+                                                    status = "Preview ready: ${view.title ?: url}"
+                                                    captureAndSend(view)
+                                                }
+                                            }
+                                            setBackgroundColor(android.graphics.Color.WHITE)
+                                            browserView = this
+                                        }
+                                    },
+                                    update = { browserView = it }
+                                )
+                            }
+                        }
+
+                        if (pageLoading) {
+                            LinearProgressIndicator(
+                                progress = { pageProgress / 100f },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            Text("Loading: $pageProgress%", style = MaterialTheme.typography.labelSmall)
+                        }
+
+                        Text(status, style = MaterialTheme.typography.bodyMedium)
+                        Text(
+                            "The preview uses the same 418 × 260 image size as the watch. Touches and scrolling on the watch control this page.",
+                            style = MaterialTheme.typography.bodySmall
+                        )
                     }
                 }
             }
