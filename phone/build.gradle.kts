@@ -2,6 +2,10 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
 }
+
+val sharedSigningStore = System.getenv("ANDROID_KEYSTORE_PATH")
+val sharedSigningPassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
+
 android {
     namespace = "com.wristbrowser"
     compileSdk = 35
@@ -9,8 +13,27 @@ android {
         applicationId = "com.wristbrowser"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "0.1.1"
+    }
+    signingConfigs {
+        create("velaRelease") {
+            if (!sharedSigningStore.isNullOrBlank() && !sharedSigningPassword.isNullOrBlank()) {
+                storeFile = file(sharedSigningStore)
+                storeType = "PKCS12"
+                storePassword = sharedSigningPassword
+                keyAlias = "wristbrowser"
+                keyPassword = sharedSigningPassword
+            }
+        }
+    }
+    buildTypes {
+        getByName("release") {
+            isMinifyEnabled = false
+            if (!sharedSigningStore.isNullOrBlank() && !sharedSigningPassword.isNullOrBlank()) {
+                signingConfig = signingConfigs.getByName("velaRelease")
+            }
+        }
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
