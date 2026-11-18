@@ -93,7 +93,7 @@ class MainActivity : ComponentActivity() {
                         sendingImage = false
                         status = "Could not capture preview: ${e.message ?: "error"}"
                     }
-                }, 500)
+                }, 120)
             }
 
             fun openBrowserUrl(raw: String, sendWhenReady: Boolean = false) {
@@ -152,7 +152,7 @@ class MainActivity : ComponentActivity() {
                                         sendAfterLoad = true
                                         val script = "(function(){var x=($x/418)*window.innerWidth;var y=($y/260)*window.innerHeight;var e=document.elementFromPoint(x,y);if(!e)return '';var a=e.closest('a[href]');if(a&&a.href&&a.href.indexOf('https:')===0)return a.href;var b=e.closest('button,input,select,textarea,[role=button],[onclick]');(b||e).click();return '';})()"
                                         view.evaluateJavascript(script) { result ->
-                                            val href = try { org.json.JSONTokener(result ?: "\"\\\"\\\"").nextValue() as? String } catch (_: Exception) { null }
+                                            val href = try { org.json.JSONTokener(result ?: "\"\"").nextValue() as? String } catch (_: Exception) { null }
                                             if (!href.isNullOrBlank() && href.startsWith("https://")) {
                                                 view.loadUrl(href)
                                             } else {
