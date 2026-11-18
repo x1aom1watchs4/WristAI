@@ -5,6 +5,7 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 data class WebPage(val url: String, val title: String, val text: String)
+data class PageImage(val title: String, val jpeg: ByteArray)
 
 object PageLoader {
     fun load(input: String): WebPage {
