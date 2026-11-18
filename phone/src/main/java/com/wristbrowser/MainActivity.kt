@@ -111,8 +111,8 @@ class MainActivity : ComponentActivity() {
                                     }
                                 }
                                 "tap" -> {
-                                    val x = command.optDouble("x", -1.0).toInt().coerceIn(0, 465)
-                                    val y = command.optDouble("y", -1.0).toInt().coerceIn(0, 465)
+                                    val x = command.optDouble("x", -1.0).toInt().coerceIn(0, 417)
+                                    val y = command.optDouble("y", -1.0).toInt().coerceIn(0, 259)
                                     browserView?.evaluateJavascript(
                                         "(function(){var e=document.elementFromPoint($x, $y);if(e){e.scrollIntoView({block:'center'});var a=e.closest('a,button,input,[role=button]');if(a){a.click();}else{e.click();}}})()",
                                         null
