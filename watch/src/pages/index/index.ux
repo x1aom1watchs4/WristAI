@@ -3,327 +3,139 @@
     <text class="brand">WristBrowser</text>
     <text class="status">{{status}}</text>
     <div class="searchRow">
-      <input class="query" type="text" value="{{query}}" placeholder="Search Google..." @change="onQueryChange" />
-      <input type="button" class="searchButton" value="Go" @click="search" />
+      <input class="query" type="text" value="{{query}}" placeholder="Search or enter URL" @change="onQueryChange" />
+      <input type="button" class="searchButton" value="GO" @click="openQuery" />
     </div>
     <div class="controls">
-      <input type="button" class="smallButton" value="UP" @click="scrollUp" />
-      <input type="button" class="smallButton" value="DOWN" @click="scrollDown" />
-      <input type="button" class="smallButton" value="CONNECT" @click="checkConnection" />
-    </div>
-    <div class="controls navControls">
       <input type="button" class="smallButton" value="BACK" @click="goBack" />
       <input type="button" class="smallButton" value="FORWARD" @click="goForward" />
       <input type="button" class="smallButton" value="RELOAD" @click="reloadPage" />
     </div>
     <text class="heading">{{pageTitle}}</text>
-    <image if="{{imageData}}" class="browserImage" src="{{imageData}}" @touchstart="imageTouchStart" @touchend="imageTouchEnd" @complete="onImageComplete" @error="onImageError" />
-    <scroll if="{{!imageData}}" class="reader">
+    <scroll class="reader">
       <text class="body">{{pageText}}</text>
     </scroll>
   </div>
 </template>
 
 <script>
-import interconnect from '@system.interconnect'
-import file from '@system.file'
+import fetch from '@system.fetch'
 
-let connection = null
-let connectionOpened = false
 export default {
   private: {
-    status: 'Waiting for phone',
-    pageTitle: 'Enter a Google search',
-    pageText: 'Search results and web pages will appear here as website snapshots.',
+    status: 'Ready — direct watch connection',
+    pageTitle: 'Search the web',
+    pageText: 'Enter a search or website above. Pages are requested directly by the watch. Scroll this area to read.',
     query: '',
-    transferId: '',
-    expected: 0,
-    chunks: [],
-    receivedCount: 0,
-    imageData: '',
-    imageTitle: '',
-    touchStartX: -1,
-    touchStartY: -1
-  },
-  onInit() {
-    this.bindConnection()
-  },
-  bindConnection() {
-    try {
-      connection = interconnect.instance()
-      connection.onopen = () => { connectionOpened = true; this.status = 'Phone connected' }
-      connection.onclose = () => { connectionOpened = false; this.status = 'Connection closed' }
-      connection.onerror = (e) => { connectionOpened = false; this.status = 'Connection error: ' + (e && e.code !== undefined ? e.code : 'unknown') }
-      connection.onmessage = (event) => {
-        const raw = event && event.data !== undefined ? event.data : event
-        this.handleMessage(raw)
-      }
-      this.checkConnection()
-    } catch (e) {
-      this.status = 'Connection startup error'
-    }
-  },
-  sendCommand(type, extra) {
-    try {
-      if (!connection) connection = interconnect.instance()
-      let data = { protocol: 1, type: type }
-      if (extra) {
-        Object.keys(extra).forEach((key) => { data[key] = extra[key] })
-      }
-      connection.send({
-        data: data,
-        success: () => {},
-        fail: () => { this.status = 'Could not send command to phone' }
-      })
-    } catch (e) {
-      this.status = 'Command send error'
-    }
+    currentUrl: '',
+    history: [],
+    historyIndex: -1,
+    requestNumber: 0
   },
   onQueryChange(event) {
     this.query = event && event.value !== undefined ? event.value : this.query
   },
-  search() {
-    const value = (this.query || '').trim()
-    if (!value) {
-      this.status = 'Enter a search first'
+  normalizeUrl(value) {
+    const input = String(value || '').trim()
+    if (!input) return ''
+    if (/^https?:\/\//i.test(input)) return input
+    if (input.indexOf(' ') >= 0 || input.indexOf('.') < 0) {
+      return 'https://www.google.com/search?q=' + encodeURIComponent(input)
+    }
+    return 'https://' + input
+  },
+  openQuery() {
+    const url = this.normalizeUrl(this.query)
+    if (!url) {
+      this.status = 'Enter a search or website'
       return
     }
-    this.imageData = ''
-    this.pageTitle = 'Search: ' + value
-    this.status = 'Searching Google...'
-    this.sendCommand('search', { query: value })
+    this.history = this.history.slice(0, this.historyIndex + 1)
+    this.history.push(url)
+    this.historyIndex = this.history.length - 1
+    this.loadUrl(url)
   },
-  scrollUp() {
-    this.sendCommand('scroll', { delta: -560 })
-  },
-  scrollDown() {
-    this.sendCommand('scroll', { delta: 560 })
-  },
-  onImageComplete(event) {
-    const width = event && event.width ? event.width : 0
-    const height = event && event.height ? event.height : 0
-    this.status = width && height ? 'Image displayed ' + width + 'x' + height : 'Image displayed'
-    this.sendCommand('browser_image_ack', { id: this.transferId, ok: true, width: width, height: height })
-  },
-  onImageError() {
-    this.status = 'Image display failed'
-    this.sendCommand('browser_image_ack', { id: this.transferId, ok: false, error: 'image component could not load local file' })
-  },
-  getImageTouch(event, useChanged) {
-    if (!event) return null
-    const list = useChanged ? event.changedTouches : event.touches
-    if (list && list.length) return list[0]
-    return event
-  },
-  imageTouchStart(event) {
-    const point = this.getImageTouch(event, false)
-    if (!point || point.offsetX === undefined || point.offsetY === undefined) {
-      this.touchStartX = -1
-      this.touchStartY = -1
-      return
-    }
-    this.touchStartX = point.offsetX
-    this.touchStartY = point.offsetY
-  },
-  imageTouchEnd(event) {
-    const point = this.getImageTouch(event, true)
-    if (!point || this.touchStartX < 0 || this.touchStartY < 0 ||
-        point.offsetX === undefined || point.offsetY === undefined) {
-      this.touchStartX = -1
-      this.touchStartY = -1
-      return
-    }
-    const dx = point.offsetX - this.touchStartX
-    const dy = point.offsetY - this.touchStartY
-    this.touchStartX = -1
-    this.touchStartY = -1
-
-    if (Math.abs(dy) >= 24 && Math.abs(dy) > Math.abs(dx)) {
-      const delta = Math.round(-dy * 520 / 205)
-      this.status = delta > 0 ? 'Scrolling down...' : 'Scrolling up...'
-      this.sendCommand('scroll', { delta: delta })
-      return
-    }
-    if (Math.abs(dx) <= 18 && Math.abs(dy) <= 18) {
-      const x = Math.round(point.offsetX * 418 / 300)
-      const y = Math.round(point.offsetY * 260 / 205)
-      this.status = 'Opening link...'
-      this.sendCommand('tap', {
-        x: Math.max(0, Math.min(417, x)),
-        y: Math.max(0, Math.min(259, y))
-      })
-    }
-  },
-  goBack() {
-    this.sendCommand('back')
-  },
-  goForward() {
-    this.sendCommand('forward')
-  },
-  reloadPage() {
-    this.sendCommand('reload')
-  },
-  checkConnection() {
-    try {
-      if (!connection) {
-        connection = interconnect.instance()
-        this.bindConnection()
-        return
-      }
-      this.status = connectionOpened ? 'Phone connected' : 'Waiting for phone connection...'
-    } catch (e) {
-      this.status = 'Connection check error'
-    }
-  },
-  base64ToArrayBuffer(base64) {
-    const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
-    const clean = String(base64).replace(/[^A-Za-z0-9+/=]/g, '')
-    const padding = clean.endsWith('==') ? 2 : (clean.endsWith('=') ? 1 : 0)
-    const bytes = new Uint8Array(Math.max(0, Math.floor(clean.length * 3 / 4) - padding))
-    let accumulator = 0
-    let bits = 0
-    let output = 0
-    for (let i = 0; i < clean.length; i++) {
-      const ch = clean[i]
-      if (ch === '=') break
-      const value = alphabet.indexOf(ch)
-      if (value < 0) continue
-      accumulator = (accumulator << 6) | value
-      bits += 6
-      if (bits >= 8) {
-        bits -= 8
-        if (output < bytes.length) bytes[output++] = (accumulator >> bits) & 255
-      }
-    }
-    return bytes
-  },
-  handleMessage(raw) {
-    this.status = 'MESSAGE RECEIVED'
-    let msg
-    try {
-      msg = typeof raw === 'string' ? JSON.parse(raw) : raw
-    } catch (e) {
-      this.status = 'BAD JSON'
-      return
-    }
-    if (!msg || msg.protocol !== 1 || !msg.type || !msg.id) {
-      this.status = 'BAD HEADER'
-      return
-    }
-
-    if (msg.type === 'browser_image_start') {
-      if (!Number.isInteger(msg.chunks) || msg.chunks < 1 || msg.chunks > 256) {
-        this.status = 'Invalid image transfer'
-        return
-      }
-      this.transferId = msg.id
-      this.expected = msg.chunks
-      this.chunks = []
-      this.receivedCount = 0
-      this.imageTitle = typeof msg.title === 'string' ? msg.title.slice(0, 120) : 'Web page'
-      this.pageTitle = this.imageTitle
-      this.imageData = ''
-      this.status = 'Receiving image 0/' + this.expected
-      return
-    }
-
-    if (msg.type === 'page_start') {
-      if (!Number.isInteger(msg.chunks) || msg.chunks < 1 || msg.chunks > 256) return
-      this.transferId = msg.id
-      this.expected = msg.chunks
-      this.chunks = []
-      this.receivedCount = 0
-      this.pageTitle = typeof msg.title === 'string' ? msg.title.slice(0, 160) : 'Web page'
-      this.pageText = ''
-      this.imageData = ''
-      this.status = 'Receiving text: 0/' + this.expected
-      return
-    }
-
-    if (msg.id !== this.transferId) return
-    if (msg.type === 'browser_image_chunk') {
-      if (!Number.isInteger(msg.index) || msg.index < 0 || msg.index >= this.expected || typeof msg.data !== 'string') return
-      if (this.chunks[msg.index] === undefined) this.receivedCount++
-      this.chunks[msg.index] = msg.data
-      this.status = 'IMAGE CHUNK ' + this.receivedCount + '/' + this.expected
-      return
-    }
-    if (msg.type === 'browser_image_end') {
-      if (this.receivedCount !== this.expected) {
-        this.status = 'Incomplete image: ' + this.receivedCount + '/' + this.expected
-        return
-      }
-      let encoded = ''
-      for (let i = 0; i < this.expected; i++) {
-        if (typeof this.chunks[i] !== 'string') return
-        encoded += this.chunks[i]
-      }
-      try {
-        const buffer = this.base64ToArrayBuffer(encoded)
-        this.chunks = []
-        if (buffer.length < 4 || buffer[0] !== 255 || buffer[1] !== 216) {
-          this.status = 'Invalid JPEG data'
-          this.sendCommand('browser_image_ack', { id: this.transferId, ok: false, error: 'invalid JPEG data' })
+  loadUrl(url) {
+    this.requestNumber++
+    const requestId = this.requestNumber
+    this.currentUrl = url
+    this.status = 'Loading directly on watch...'
+    this.pageTitle = url
+    this.pageText = 'Downloading page content...'
+    fetch.fetch({
+      url: url,
+      method: 'GET',
+      responseType: 'text',
+      header: {
+        'Accept': 'text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.8'
+      },
+      success: (response) => {
+        if (requestId !== this.requestNumber) return
+        if (!response || response.code < 200 || response.code >= 400) {
+          this.status = 'HTTP error: ' + (response ? response.code : 'no response')
+          this.pageText = 'The website did not return a readable page.'
           return
         }
-        const uri = 'internal://cache/wristbrowser-' + this.transferId + '.jpg'
-        this.status = 'Saving image (' + buffer.length + ' bytes)'
-        file.writeArrayBuffer({
-          uri: uri,
-          buffer: buffer,
-          success: () => {
-            file.get({
-              uri: uri,
-              success: (info) => {
-                if (!info || !info.length) {
-                  this.status = 'Saved image is empty'
-                  this.sendCommand('browser_image_ack', { id: this.transferId, ok: false, error: 'saved image is empty' })
-                  return
-                }
-                this.imageData = uri
-                this.status = 'Loading image (' + info.length + ' bytes)'
-              },
-              fail: (e, code) => {
-                this.status = 'Image check failed: ' + code
-                this.sendCommand('browser_image_ack', { id: this.transferId, ok: false, error: 'file check ' + String(code || 'failed') })
-              }
-            })
-          },
-          fail: (e, code) => {
-            this.status = 'Image save error: ' + code
-            this.sendCommand('browser_image_ack', { id: this.transferId, ok: false, error: String(code || 'file write failed') })
-          }
-        })
-      } catch (e) {
-        this.status = 'Image processing error'
-        this.sendCommand('browser_image_ack', { id: this.transferId, ok: false, error: 'image processing exception' })
+        const html = typeof response.data === 'string' ? response.data : String(response.data || '')
+        this.showHtml(html, url)
+        this.status = 'Loaded directly on watch · HTTP ' + response.code
+      },
+      fail: (error, code) => {
+        if (requestId !== this.requestNumber) return
+        this.status = 'Network error ' + String(code || '')
+        this.pageText = 'Could not load this page. Check the watch internet connection and try again. ' + String(error || '')
       }
+    })
+  },
+  decodeHtml(text) {
+    return String(text || '')
+      .replace(/&nbsp;|&#160;/gi, ' ')
+      .replace(/&amp;/gi, '&')
+      .replace(/&lt;/gi, '<')
+      .replace(/&gt;/gi, '>')
+      .replace(/&quot;/gi, '"')
+      .replace(/&#39;|&apos;/gi, "'")
+      .replace(/&#(\d+);/g, (match, number) => String.fromCharCode(Number(number)))
+      .replace(/&#x([0-9a-f]+);/gi, (match, number) => String.fromCharCode(parseInt(number, 16)))
+  },
+  showHtml(html, url) {
+    let title = ''
+    const titleMatch = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)
+    if (titleMatch) title = this.decodeHtml(titleMatch[1].replace(/<[^>]*>/g, ' ')).trim()
+    let content = html
+      .replace(/<!--[\s\S]*?-->/g, ' ')
+      .replace(/<(script|style|noscript|svg|iframe|nav|footer)[^>]*>[\s\S]*?<\/\1>/gi, ' ')
+      .replace(/<(br|\/p|\/div|\/li|\/h[1-6]|\/section|\/article|\/tr|\/blockquote)[^>]*>/gi, '\n')
+      .replace(/<[^>]+>/g, ' ')
+    content = this.decodeHtml(content)
+      .replace(/[\t\r ]+/g, ' ')
+      .replace(/ *\n */g, '\n')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim()
+    if (!content) content = 'This page contains no readable text, or the site requires JavaScript.'
+    this.pageTitle = title || url
+    this.pageText = content.slice(0, 24000)
+  },
+  goBack() {
+    if (this.historyIndex <= 0) {
+      this.status = 'No previous page'
       return
     }
-
-    if (msg.type === 'page_chunk') {
-      if (!Number.isInteger(msg.index) || msg.index < 0 || msg.index >= this.expected || typeof msg.text !== 'string') return
-      if (this.chunks[msg.index] === undefined) this.receivedCount++
-      this.chunks[msg.index] = msg.text
-      this.status = 'Text: ' + this.receivedCount + '/' + this.expected
+    this.historyIndex--
+    this.loadUrl(this.history[this.historyIndex])
+  },
+  goForward() {
+    if (this.historyIndex >= this.history.length - 1) {
+      this.status = 'No next page'
       return
     }
-    if (msg.type === 'page_end') {
-      if (this.receivedCount !== this.expected) return
-      let complete = ''
-      for (let i = 0; i < this.expected; i++) {
-        if (typeof this.chunks[i] !== 'string') return
-        complete += this.chunks[i]
-      }
-      this.pageText = complete
-      file.writeText({
-        uri: 'internal://files/wristbrowser-page.txt',
-        text: complete,
-        encoding: 'UTF-8',
-        success: () => { this.status = 'Text page received and saved' },
-        fail: (e, code) => { this.status = 'Save error: ' + code }
-      })
-    }
+    this.historyIndex++
+    this.loadUrl(this.history[this.historyIndex])
+  },
+  reloadPage() {
+    if (this.currentUrl) this.loadUrl(this.currentUrl)
+    else this.openQuery()
   }
 }
 </script>
@@ -334,21 +146,19 @@ export default {
   height: 466px;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  padding: 28px 0px;
+  padding: 24px 0px 18px;
   box-sizing: border-box;
   background-color: #101820;
   font-family: sans-serif;
 }
-.brand { color: #8ed6c5; font-size: 18px; font-weight: bold; margin-bottom: 2px; }
-.status { width: 300px; color: #9aa7b2; font-size: 11px; margin-bottom: 6px; text-align: center; }
+.brand { color: #8ed6c5; font-size: 18px; font-weight: bold; margin-bottom: 3px; }
+.status { width: 300px; color: #9aa7b2; font-size: 11px; margin-bottom: 7px; text-align: center; }
 .searchRow { width: 300px; height: 42px; flex-direction: row; margin-bottom: 7px; }
-.query { width: 202px; height: 40px; color: #ffffff; background-color: #263440; font-size: 14px; }
-.searchButton { width: 90px; height: 40px; color: #101820; background-color: #8ed6c5; font-size: 14px; margin-left: 8px; }
-.controls { width: 300px; height: 34px; flex-direction: row; justify-content: space-between; margin-bottom: 5px; }
+.query { width: 222px; height: 40px; color: #ffffff; background-color: #263440; font-size: 13px; }
+.searchButton { width: 70px; height: 40px; color: #101820; background-color: #8ed6c5; font-size: 13px; margin-left: 8px; }
+.controls { width: 300px; height: 34px; flex-direction: row; justify-content: space-between; margin-bottom: 6px; }
 .smallButton { width: 94px; height: 32px; color: #101820; background-color: #8ed6c5; font-size: 12px; }
-.heading { width: 300px; color: #ffffff; font-size: 13px; font-weight: bold; margin-bottom: 3px; text-align: center; }
-.browserImage { width: 300px; height: 205px; object-fit: contain; }
-.reader { width: 300px; height: 205px; }
-.body { color: #e2e8ed; font-size: 15px; line-height: 1.3; }
+.heading { width: 300px; color: #ffffff; font-size: 13px; font-weight: bold; margin-bottom: 5px; text-align: center; }
+.reader { width: 300px; height: 300px; }
+.body { color: #e2e8ed; font-size: 15px; line-height: 1.35; }
 </style>
