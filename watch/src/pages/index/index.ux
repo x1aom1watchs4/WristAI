@@ -92,6 +92,7 @@ export default {
   },
   onImageComplete(event) {
     this.status = 'Картинка отображается. Можно нажимать по ссылкам и прокручивать.'
+    this.sendCommand('browser_image_ack', { id: this.transferId, ok: true })
   },
   onImageError() {
     this.status = 'Файл получен, но часы не смогли декодировать JPEG.'
@@ -184,9 +185,8 @@ export default {
           uri: 'internal://files/wristbrowser-screen.jpg',
           buffer: buffer,
           success: () => {
-            this.imageData = 'internal://cache/wristbrowser-screen.jpg'
-            this.status = 'Снимок сохранён. Показываю страницу…'
-            this.sendCommand('browser_image_ack', { id: this.transferId, ok: true })
+            this.imageData = 'internal://files/wristbrowser-screen.jpg'
+            this.status = 'Файл сохранён. Ожидаю отображения…'
           },
           fail: (e, code) => {
             this.status = 'Ошибка сохранения снимка: ' + code
