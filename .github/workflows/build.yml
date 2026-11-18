@@ -109,7 +109,7 @@ jobs:
         run: npm install --no-audit --no-fund
       - name: Build Xiaomi Vela debug RPK
         working-directory: watch
-        run: npm run build -- --complete-feature
+        run: npm run build
       - name: Verify and stage debug RPK
         working-directory: watch
         run: |
@@ -150,7 +150,7 @@ jobs:
       - name: Build Xiaomi Vela release RPK
         if: steps.signing.outputs.ready == 'true'
         working-directory: watch
-        run: npm run release -- --complete-feature
+        run: npm run release
       - name: Verify and stage release RPK
         if: steps.signing.outputs.ready == 'true'
         working-directory: watch
