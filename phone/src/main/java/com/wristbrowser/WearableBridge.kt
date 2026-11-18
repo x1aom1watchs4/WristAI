@@ -54,7 +54,7 @@ class WearableBridge(context: Context) {
             return
         }
         val encoded = Base64.encodeToString(jpeg, Base64.NO_WRAP)
-        val chunks = encoded.chunked(4800)
+        val chunks = encoded.chunked(2400)
         val id = UUID.randomUUID().toString()
         val start = JSONObject().put("protocol", 1).put("type", "browser_image_start")
             .put("id", id).put("title", title.take(120)).put("chunks", chunks.size).toString()
@@ -68,7 +68,7 @@ class WearableBridge(context: Context) {
         if (index >= chunks.size) {
             val end = JSONObject().put("protocol", 1).put("type", "browser_image_end")
                 .put("id", transferId).toString()
-            sendPayload(id, end, { status("Изображение отправлено на часы.") },
+            sendPayload(id, end, { status("Передача завершена. Жду подтверждения часов…") },
                 { status("Ошибка завершения изображения: $it") })
             return
         }
