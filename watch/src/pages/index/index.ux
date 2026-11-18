@@ -107,15 +107,28 @@ export default {
   checkConnection() {
     try {
       if (!connection) connection = interconnect.instance()
+      this.status = 'Checking connection...'
       connection.diagnosis({
         timeout: 10000,
         success: (result) => {
-          this.status = result && result.status === 0 ? 'Phone connected' : 'Phone not found'
+          const code = result && result.status !== undefined ? result.status : 'unknown'
+          if (code === 0) {
+            this.status = 'Phone connected'
+          } else if (code === 204) {
+            this.status = 'Connect timeout (204)'
+          } else if (code === 1001) {
+            this.status = 'Phone app not installed (1001)'
+          } else {
+            this.status = 'Connection status: ' + code
+          }
         },
-        fail: () => { this.status = 'Could not check connection' }
+        fail: (data, code) => {
+          const detail = typeof data === 'string' ? data : (data && data.data ? data.data : 'no details')
+          this.status = 'Check failed (' + (code !== undefined ? code : 'unknown') + '): ' + String(detail).slice(0, 70)
+        }
       })
     } catch (e) {
-      this.status = 'Connection check error'
+      this.status = 'Check exception: ' + String(e && e.message ? e.message : e).slice(0, 70)
     }
   },
   base64ToArrayBuffer(base64) {
