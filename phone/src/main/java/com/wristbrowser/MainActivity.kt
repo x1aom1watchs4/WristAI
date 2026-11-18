@@ -43,8 +43,8 @@ class MainActivity : ComponentActivity() {
             fun captureAndSend(view: WebView) {
                 mainHandler.postDelayed({
                     try {
-                        val width = 466
-                        val height = 466
+                        val width = 418
+                        val height = 260
                         val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.RGB_565)
                         val canvas = Canvas(bitmap)
                         val sx = width.toFloat() / view.width.coerceAtLeast(1)
@@ -52,7 +52,7 @@ class MainActivity : ComponentActivity() {
                         canvas.scale(sx, sy)
                         view.draw(canvas)
                         val output = ByteArrayOutputStream()
-                        bitmap.compress(Bitmap.CompressFormat.JPEG, 58, output)
+                        bitmap.compress(Bitmap.CompressFormat.JPEG, 45, output)
                         bitmap.recycle()
                         bridge.sendBrowserImage(view.title?.ifBlank { view.url ?: "Веб-страница" } ?: "Веб-страница", output.toByteArray()) {
                             status = it
@@ -83,6 +83,13 @@ class MainActivity : ComponentActivity() {
                         try {
                             val command = JSONObject(raw)
                             when (command.optString("type")) {
+                                "browser_image_ack" -> {
+                                    status = if (command.optBoolean("ok", false)) {
+                                        "Часы подтвердили: изображение сохранено и показано."
+                                    } else {
+                                        "Часы не смогли сохранить изображение: " + command.optString("error", "неизвестная ошибка")
+                                    }
+                                }
                                 "search" -> {
                                     val query = command.optString("query").take(300)
                                     if (query.isNotBlank()) openBrowserUrl(query)
