@@ -101,9 +101,9 @@ export default {
     this.sendCommand('browser_image_ack', { id: this.transferId, ok: false, error: 'image decode failed' })
   },
   tapImage(event) {
-    const x = event && event.pageX !== undefined ? Math.round((event.pageX - 24) * 466 / 418) : 233
-    const y = event && event.pageY !== undefined ? Math.round((event.pageY - 145) * 466 / 250) : 233
-    this.sendCommand('tap', { x: Math.max(0, Math.min(465, x)), y: Math.max(0, Math.min(465, y)) })
+    const x = event && event.pageX !== undefined ? Math.round((event.pageX - 83) * 418 / 300) : 209
+    const y = event && event.pageY !== undefined ? Math.round((event.pageY - 180) * 260 / 205) : 130
+    this.sendCommand('tap', { x: Math.max(0, Math.min(417, x)), y: Math.max(0, Math.min(259, y)) })
   },
   checkConnection() {
     try {
@@ -137,7 +137,7 @@ export default {
         if (output < bytes.length) bytes[output++] = (accumulator >> bits) & 255
       }
     }
-    return bytes.buffer
+    return bytes
   },
   handleMessage(raw) {
     this.status = 'MESSAGE RECEIVED'
@@ -253,19 +253,20 @@ export default {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 16px 32px;
+  padding: 28px 0px;
+  box-sizing: border-box;
   background-color: #101820;
   font-family: sans-serif;
 }
-.brand { color: #8ed6c5; font-size: 20px; font-weight: bold; margin-bottom: 2px; }
-.status { color: #9aa7b2; font-size: 12px; margin-bottom: 6px; text-align: center; }
-.searchRow { width: 380px; height: 44px; flex-direction: row; margin-bottom: 7px; }
-.query { width: 258px; height: 42px; color: #ffffff; background-color: #263440; font-size: 15px; }
-.searchButton { width: 112px; height: 42px; color: #101820; background-color: #8ed6c5; font-size: 15px; margin-left: 8px; }
-.controls { width: 380px; height: 36px; flex-direction: row; justify-content: space-between; margin-bottom: 5px; }
-.smallButton { width: 118px; height: 34px; color: #101820; background-color: #8ed6c5; font-size: 13px; }
-.heading { color: #ffffff; font-size: 14px; font-weight: bold; margin-bottom: 3px; }
-.browserImage { width: 380px; height: 235px; object-fit: contain; }
-.reader { width: 380px; height: 235px; }
+.brand { color: #8ed6c5; font-size: 18px; font-weight: bold; margin-bottom: 2px; }
+.status { width: 300px; color: #9aa7b2; font-size: 11px; margin-bottom: 6px; text-align: center; }
+.searchRow { width: 300px; height: 42px; flex-direction: row; margin-bottom: 7px; }
+.query { width: 202px; height: 40px; color: #ffffff; background-color: #263440; font-size: 14px; }
+.searchButton { width: 90px; height: 40px; color: #101820; background-color: #8ed6c5; font-size: 14px; margin-left: 8px; }
+.controls { width: 300px; height: 34px; flex-direction: row; justify-content: space-between; margin-bottom: 5px; }
+.smallButton { width: 94px; height: 32px; color: #101820; background-color: #8ed6c5; font-size: 12px; }
+.heading { width: 300px; color: #ffffff; font-size: 13px; font-weight: bold; margin-bottom: 3px; text-align: center; }
+.browserImage { width: 300px; height: 205px; object-fit: contain; }
+.reader { width: 300px; height: 205px; }
 .body { color: #e2e8ed; font-size: 15px; line-height: 1.3; }
 </style>
