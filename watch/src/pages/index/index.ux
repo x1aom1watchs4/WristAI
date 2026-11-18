@@ -4,12 +4,12 @@
     <text class="status">{{status}}</text>
     <div class="searchRow">
       <input class="query" type="text" value="{{query}}" placeholder="Search Google..." @change="onQueryChange" />
-      <input type="button" class="searchButton" value="Search" @click="search" />
+      <input type="button" class="searchButton" value="Go" @click="search" />
     </div>
     <div class="controls">
-      <input type="button" class="smallButton" value="▲" @click="scrollUp" />
-      <input type="button" class="smallButton" value="▼" @click="scrollDown" />
-      <input type="button" class="smallButton" value="Connect" @click="checkConnection" />
+      <input type="button" class="smallButton" value="UP" @click="scrollUp" />
+      <input type="button" class="smallButton" value="DOWN" @click="scrollDown" />
+      <input type="button" class="smallButton" value="LINK" @click="checkConnection" />
     </div>
     <text class="heading">{{pageTitle}}</text>
     <image if="{{imageData}}" class="browserImage" src="{{imageData}}" @click="tapImage" @complete="onImageComplete" @error="onImageError" />
@@ -93,11 +93,11 @@ export default {
     this.sendCommand('scroll', { delta: 320 })
   },
   onImageComplete(event) {
-    this.status = 'Image displayed. Tap links or scroll.'
+    this.status = 'Image ready'
     this.sendCommand('browser_image_ack', { id: this.transferId, ok: true })
   },
   onImageError() {
-    this.status = 'File received, but the watch could not decode the JPEG.'
+    this.status = 'Image decode error'
     this.sendCommand('browser_image_ack', { id: this.transferId, ok: false, error: 'image decode failed' })
   },
   tapImage(event) {
@@ -118,10 +118,26 @@ export default {
     }
   },
   base64ToArrayBuffer(base64) {
-    const binary = atob(base64)
-    const bytes = new Uint8Array(binary.length)
-    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
-    return bytes
+    const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
+    const clean = String(base64).replace(/[^A-Za-z0-9+/=]/g, '')
+    const padding = clean.endsWith('==') ? 2 : (clean.endsWith('=') ? 1 : 0)
+    const bytes = new Uint8Array(Math.max(0, Math.floor(clean.length * 3 / 4) - padding))
+    let accumulator = 0
+    let bits = 0
+    let output = 0
+    for (let i = 0; i < clean.length; i++) {
+      const ch = clean[i]
+      if (ch === '=') break
+      const value = alphabet.indexOf(ch)
+      if (value < 0) continue
+      accumulator = (accumulator << 6) | value
+      bits += 6
+      if (bits >= 8) {
+        bits -= 8
+        if (output < bytes.length) bytes[output++] = (accumulator >> bits) & 255
+      }
+    }
+    return bytes.buffer
   },
   handleMessage(raw) {
     this.status = 'MESSAGE RECEIVED'
@@ -190,7 +206,7 @@ export default {
           buffer: buffer,
           success: () => {
             this.imageData = 'internal://files/wristbrowser-screen.jpg'
-            this.status = 'File saved. Waiting for display...'
+            this.status = 'Opening image...'
           },
           fail: (e, code) => {
             this.status = 'Image save error: ' + code
@@ -198,7 +214,7 @@ export default {
           }
         })
       } catch (e) {
-        this.status = 'Could not process image'
+        this.status = 'Image decode error'
       }
       return
     }
@@ -235,19 +251,21 @@ export default {
   width: 466px;
   height: 466px;
   flex-direction: column;
-  padding: 18px 24px;
+  align-items: center;
+  justify-content: center;
+  padding: 16px 32px;
   background-color: #101820;
   font-family: sans-serif;
 }
-.brand { color: #8ed6c5; font-size: 22px; font-weight: bold; margin-bottom: 4px; }
-.status { color: #9aa7b2; font-size: 14px; margin-bottom: 5px; }
-.searchRow { width: 418px; height: 48px; flex-direction: row; margin-bottom: 5px; }
-.query { width: 290px; height: 46px; color: #ffffff; background-color: #263440; font-size: 17px; }
-.searchButton { width: 118px; height: 46px; color: #101820; background-color: #8ed6c5; font-size: 17px; margin-left: 8px; }
-.controls { width: 418px; height: 42px; flex-direction: row; justify-content: space-between; margin-bottom: 4px; }
-.smallButton { width: 128px; height: 40px; color: #101820; background-color: #8ed6c5; font-size: 16px; }
-.heading { color: #ffffff; font-size: 17px; font-weight: bold; margin-bottom: 4px; }
-.browserImage { width: 418px; height: 260px; object-fit: contain; }
-.reader { width: 418px; height: 250px; }
-.body { color: #e2e8ed; font-size: 17px; line-height: 1.4; }
+.brand { color: #8ed6c5; font-size: 20px; font-weight: bold; margin-bottom: 2px; }
+.status { color: #9aa7b2; font-size: 12px; margin-bottom: 6px; text-align: center; }
+.searchRow { width: 380px; height: 44px; flex-direction: row; margin-bottom: 7px; }
+.query { width: 258px; height: 42px; color: #ffffff; background-color: #263440; font-size: 15px; }
+.searchButton { width: 112px; height: 42px; color: #101820; background-color: #8ed6c5; font-size: 15px; margin-left: 8px; }
+.controls { width: 380px; height: 36px; flex-direction: row; justify-content: space-between; margin-bottom: 5px; }
+.smallButton { width: 118px; height: 34px; color: #101820; background-color: #8ed6c5; font-size: 13px; }
+.heading { color: #ffffff; font-size: 14px; font-weight: bold; margin-bottom: 3px; }
+.browserImage { width: 380px; height: 235px; object-fit: contain; }
+.reader { width: 380px; height: 235px; }
+.body { color: #e2e8ed; font-size: 15px; line-height: 1.3; }
 </style>
