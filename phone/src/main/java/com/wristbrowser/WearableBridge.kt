@@ -33,15 +33,15 @@ class WearableBridge(context: Context) {
     fun send(page: WebPage, status: (String) -> Unit) {
         val connected = node
         if (connected != null) {
-            status("Часы подключены: ${connected.name}. Отправляем страницу…")
+            status("Watch connected: ${connected.name}. Sending page...")
             transferPage(connected, page, status)
             return
         }
-        status("Ищем часы и настраиваем связь…")
+        status("Finding watch and setting up connection...")
         findNode(status) { found ->
             registerCommandListener(found)
             authorizeAndOpen(found, status) {
-                status("Отправляем страницу…")
+                status("Sending page...")
                 transferPage(found, page, status)
             }
         }
@@ -50,7 +50,7 @@ class WearableBridge(context: Context) {
     fun sendBrowserImage(title: String, jpeg: ByteArray, status: (String) -> Unit) {
         val target = node
         if (target == null) {
-            status("Часы не подключены — открой WristBrowser и проверь связь.")
+            status("Watch not connected. Open WristBrowser and check the connection.")
             return
         }
         val encoded = Base64.encodeToString(jpeg, Base64.NO_WRAP)
@@ -58,26 +58,26 @@ class WearableBridge(context: Context) {
         val id = UUID.randomUUID().toString()
         val start = JSONObject().put("protocol", 1).put("type", "browser_image_start")
             .put("id", id).put("title", title.take(120)).put("chunks", chunks.size).toString()
-        status("Передаю снимок страницы на часы…")
+        status("Sending page image to watch...")
         sendPayload(target.id, start, {
             sendImagePart(target.id, id, chunks, 0, status)
-        }, { status("Не удалось начать передачу изображения: $it") })
+        }, { status("Could not start image transfer: $it") })
     }
 
     private fun sendImagePart(id: String, transferId: String, chunks: List<String>, index: Int, status: (String) -> Unit) {
         if (index >= chunks.size) {
             val end = JSONObject().put("protocol", 1).put("type", "browser_image_end")
                 .put("id", transferId).toString()
-            sendPayload(id, end, { status("Передача завершена. Жду подтверждения часов…") },
-                { status("Ошибка завершения изображения: $it") })
+            sendPayload(id, end, { status("Transfer complete. Waiting for watch confirmation...") },
+                { status("Image transfer error: $it") })
             return
         }
         val payload = JSONObject().put("protocol", 1).put("type", "browser_image_chunk")
             .put("id", transferId).put("index", index).put("data", chunks[index]).toString()
         sendPayload(id, payload, {
-            status("Снимок: ${index + 1}/${chunks.size}")
+            status("Image: ${index + 1}/${chunks.size}")
             sendImagePart(id, transferId, chunks, index + 1, status)
-        }, { status("Ошибка части изображения ${index + 1}: $it") })
+        }, { status("Image chunk error ${index + 1}: $it") })
     }
 
     private fun registerCommandListener(target: Node) {
@@ -101,7 +101,7 @@ class WearableBridge(context: Context) {
         val handler = Handler(Looper.getMainLooper())
         val timeout = Runnable {
             if (completed.compareAndSet(false, true)) {
-                status("Часы не ответили за 12 секунд. Проверь подключение в Notify for Xiaomi.")
+                status("Watch did not respond within 12 seconds. Check Notify for Xiaomi connection.")
             }
         }
         handler.postDelayed(timeout, 12_000)
@@ -116,7 +116,7 @@ class WearableBridge(context: Context) {
                         status("Часы не найдены. Проверь, что они подключены в Notify for Xiaomi.")
                     } else {
                         node = found
-                        status("Нашёл часы: ${found.name}. Проверяю разрешение…")
+                        status("Found watch: ${found.name}. Checking permission...")
                         onFound(found)
                     }
                 }
@@ -124,12 +124,12 @@ class WearableBridge(context: Context) {
                     if (!completed.compareAndSet(false, true)) return@addOnFailureListener
                     handler.removeCallbacks(timeout)
                     node = null
-                    status("Не удалось найти часы: ${error.message ?: "неизвестная ошибка"}")
+                    status("Could not find watch: ${error.message ?: "неизвестная error"}")
                 }
         } catch (error: Throwable) {
             if (completed.compareAndSet(false, true)) {
                 handler.removeCallbacks(timeout)
-                status("Ошибка поиска часов: ${error.message ?: "неизвестная ошибка"}")
+                status("Ошибка поиска часов: ${error.message ?: "неизвестная error"}")
             }
         }
     }
@@ -140,29 +140,29 @@ class WearableBridge(context: Context) {
                 .checkPermissions(target.id, arrayOf(Permission.DEVICE_MANAGER))
                 .addOnSuccessListener { grants ->
                     if (grants.any { !it }) {
-                        status("Запрашиваю разрешение на связь с часами…")
+                        status("Requesting permission to connect to watch...")
                         try {
                             Wearable.getAuthApi(app)
                                 .requestPermission(target.id, Permission.DEVICE_MANAGER)
                                 .addOnSuccessListener {
-                                    status("Запрос разрешения отправлен. Если Notify покажет запрос — подтверди его.")
+                                    status("Permission request sent. Approve it in Notify if prompted.")
                                     openWatchApp(target, status, onReady)
                                 }
                                 .addOnFailureListener { error ->
-                                    status("Не удалось запросить разрешение: ${error.message ?: "ошибка"}")
+                                    status("Could not request permission: ${error.message ?: "error"}")
                                 }
                         } catch (error: Throwable) {
-                            status("Ошибка запроса разрешения: ${error.message ?: "ошибка"}")
+                            status("Permission request error: ${error.message ?: "error"}")
                         }
                     } else {
                         openWatchApp(target, status, onReady)
                     }
                 }
                 .addOnFailureListener { error ->
-                    status("Не удалось проверить разрешение часов: ${error.message ?: "ошибка"}")
+                    status("Could not check watch permission: ${error.message ?: "error"}")
                 }
         } catch (error: Throwable) {
-            status("Ошибка проверки разрешения: ${error.message ?: "ошибка"}")
+            status("Permission check error: ${error.message ?: "error"}")
         }
     }
 
@@ -171,14 +171,14 @@ class WearableBridge(context: Context) {
             Wearable.getNodeApi(app)
                 .launchWearApp(target.id, "/pages/index")
                 .addOnSuccessListener {
-                    status("WristBrowser открыт на часах. Можно передавать страницу.")
+                    status("WristBrowser is open on the watch. Ready to send a page.")
                     onReady()
                 }
                 .addOnFailureListener { error ->
-                    status("Не удалось открыть WristBrowser на часах: ${error.message ?: "ошибка"}")
+                    status("Could not open WristBrowser on watch: ${error.message ?: "error"}")
                 }
         } catch (error: Throwable) {
-            status("Ошибка запуска WristBrowser: ${error.message ?: "ошибка"}")
+            status("WristBrowser launch error: ${error.message ?: "error"}")
         }
     }
 
@@ -187,35 +187,35 @@ class WearableBridge(context: Context) {
         val chunks = splitUtf16Safely(page.text, 900)
         val start = JSONObject().put("protocol", 1).put("type", "page_start").put("id", transferId)
             .put("url", page.url).put("title", page.title).put("chunks", chunks.size).toString()
-        status("Подготовлено частей: ${chunks.size}")
+        status("Chunks prepared: ${chunks.size}")
         sendPayload(target.id, start,
             { sendPart(target.id, transferId, chunks, 0, status) },
-            { error -> status("Не удалось начать передачу: $error") }
+            { error -> status("Could not start transfer: $error") }
         )
     }
 
     private fun sendPart(id: String, transferId: String, chunks: List<String>, index: Int, status: (String) -> Unit) {
         if (index >= chunks.size) {
             val end = JSONObject().put("protocol", 1).put("type", "page_end").put("id", transferId).toString()
-            sendPayload(id, end, { status("Данные переданы транспорту. Ожидается проверка на часах.") },
-                { status("Ошибка завершения передачи: $it") })
+            sendPayload(id, end, { status("Data sent. Waiting for watch processing.") },
+                { status("Transfer completion error: $it") })
             return
         }
         val payload = JSONObject().put("protocol", 1).put("type", "page_chunk")
             .put("id", transferId).put("index", index).put("text", chunks[index]).toString()
         sendPayload(id, payload, {
-            status("Отправка: ${index + 1}/${chunks.size}")
+            status("Sending: ${index + 1}/${chunks.size}")
             sendPart(id, transferId, chunks, index + 1, status)
-        }, { status("Ошибка части ${index + 1}: $it") })
+        }, { status("Chunk error ${index + 1}: $it") })
     }
 
     private fun sendPayload(id: String, value: String, success: () -> Unit, failure: (String) -> Unit) {
         try {
             Wearable.getMessageApi(app).sendMessage(id, value.toByteArray(StandardCharsets.UTF_8))
                 .addOnSuccessListener { success() }
-                .addOnFailureListener { failure(it.message ?: "ошибка XMS") }
+                .addOnFailureListener { failure(it.message ?: "error XMS") }
         } catch (error: Throwable) {
-            failure(error.message ?: "ошибка XMS")
+            failure(error.message ?: "error XMS")
         }
     }
 
