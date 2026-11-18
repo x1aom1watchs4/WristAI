@@ -2,6 +2,7 @@
   <div class="page">
     <text class="brand">WristBrowser</text>
     <text class="status">{{status}}</text>
+    <text class="networkStatus">{{networkStatus}}</text>
 
     <div if="{{!keyboardVisible}}" class="browser">
       <text class="searchBox" @click="showKeyboard">{{query || 'Нажми здесь для поиска'}}</text>
@@ -10,6 +11,7 @@
         <input type="button" class="smallButton" value="BACK" @click="goBack" />
         <input type="button" class="smallButton" value="NEXT" @click="goForward" />
       </div>
+      <input type="button" class="testButton" value="TEST NETWORK" @click="runDiagnostics" />
       <text class="heading">{{pageTitle}}</text>
       <scroll class="reader">
         <text class="body">{{pageText}}</text>
@@ -41,10 +43,13 @@
 
 <script>
 import fetch from '@system.fetch'
+import network from '@system.network'
+import interconnect from '@system.interconnect'
 
 export default {
   private: {
     status: 'Ready — direct watch connection',
+    networkStatus: 'Network not tested yet',
     pageTitle: 'Search the web',
     pageText: 'Tap the search field to open the on-screen keyboard.',
     query: '',
@@ -56,6 +61,64 @@ export default {
     row1: ['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'],
     row2: ['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L'],
     row3: ['Z', 'X', 'C', 'V', 'B', 'N', 'M']
+  },
+  onReady() {
+    this.runDiagnostics()
+  },
+  runDiagnostics() {
+    this.networkStatus = 'Checking network and phone bridge...'
+    const results = []
+    try {
+      network.getType({
+        success: (data) => {
+          results.push('Network: ' + String(data && data.type || 'unknown'))
+          this.networkStatus = results.join(' | ')
+        },
+        fail: (data, code) => {
+          results.push('Network API error ' + String(code || '') + ': ' + String(data || ''))
+          this.networkStatus = results.join(' | ')
+        }
+      })
+    } catch (error) {
+      results.push('Network API exception: ' + String(error))
+      this.networkStatus = results.join(' | ')
+    }
+    try {
+      const connect = interconnect.instance()
+      connect.diagnosis({
+        timeout: 8000,
+        success: (data) => {
+          const labels = {0: 'connected', 204: 'timeout', 1001: 'phone app missing', 1000: 'other error'}
+          results.push('Phone bridge: ' + String(labels[data && data.status] || data && data.status || 'unknown'))
+          this.networkStatus = results.join(' | ')
+        },
+        fail: (data, code) => {
+          results.push('Phone bridge error ' + String(code || '') + ': ' + String(data || ''))
+          this.networkStatus = results.join(' | ')
+        }
+      })
+    } catch (error) {
+      results.push('Phone bridge exception: ' + String(error))
+      this.networkStatus = results.join(' | ')
+    }
+    try {
+      fetch.fetch({
+        url: 'https://example.com',
+        method: 'GET',
+        responseType: 'text',
+        success: (response) => {
+          results.push('HTTPS test: HTTP ' + String(response && response.code || 'unknown'))
+          this.networkStatus = results.join(' | ')
+        },
+        fail: (data, code) => {
+          results.push('HTTPS test failed: ' + String(code || '') + ' ' + String(data || ''))
+          this.networkStatus = results.join(' | ')
+        }
+      })
+    } catch (error) {
+      results.push('HTTPS test exception: ' + String(error))
+      this.networkStatus = results.join(' | ')
+    }
   },
   showKeyboard() {
     this.keyboardVisible = true
@@ -192,7 +255,9 @@ export default {
   font-family: sans-serif;
 }
 .brand { color: #8ed6c5; font-size: 18px; font-weight: bold; margin-bottom: 3px; }
-.status { width: 300px; color: #9aa7b2; font-size: 11px; margin-bottom: 7px; text-align: center; }
+.status { width: 300px; color: #9aa7b2; font-size: 11px; margin-bottom: 4px; text-align: center; }
+.networkStatus { width: 300px; color: #8ed6c5; font-size: 10px; margin-bottom: 6px; text-align: center; }
+.testButton { width: 300px; height: 30px; color: #101820; background-color: #526675; font-size: 11px; margin-bottom: 6px; }
 .browser { width: 300px; flex-direction: column; align-items: center; }
 .searchBox { width: 300px; height: 42px; padding: 10px 8px; color: #ffffff; background-color: #263440; font-size: 14px; text-align: center; margin-bottom: 7px; }
 .controls { width: 300px; height: 36px; flex-direction: row; justify-content: space-between; margin-bottom: 6px; }
