@@ -11,8 +11,13 @@
       <input type="button" class="smallButton" value="DOWN" @click="scrollDown" />
       <input type="button" class="smallButton" value="CONNECT" @click="checkConnection" />
     </div>
+    <div class="controls navControls">
+      <input type="button" class="smallButton" value="BACK" @click="goBack" />
+      <input type="button" class="smallButton" value="FORWARD" @click="goForward" />
+      <input type="button" class="smallButton" value="RELOAD" @click="reloadPage" />
+    </div>
     <text class="heading">{{pageTitle}}</text>
-    <image if="{{imageData}}" class="browserImage" src="{{imageData}}" @click="tapImage" @complete="onImageComplete" @error="onImageError" />
+    <image if="{{imageData}}" class="browserImage" src="{{imageData}}" @touchstart="imageTouchStart" @touchend="imageTouchEnd" @complete="onImageComplete" @error="onImageError" />
     <scroll if="{{!imageData}}" class="reader">
       <text class="body">{{pageText}}</text>
     </scroll>
@@ -36,7 +41,9 @@ export default {
     chunks: [],
     receivedCount: 0,
     imageData: '',
-    imageTitle: ''
+    imageTitle: '',
+    touchStartX: -1,
+    touchStartY: -1
   },
   onInit() {
     this.bindConnection()
@@ -102,10 +109,59 @@ export default {
     this.status = 'Image display failed'
     this.sendCommand('browser_image_ack', { id: this.transferId, ok: false, error: 'image component could not load local file' })
   },
-  tapImage(event) {
-    const x = event && event.pageX !== undefined ? Math.round((event.pageX - 83) * 418 / 300) : 209
-    const y = event && event.pageY !== undefined ? Math.round((event.pageY - 180) * 260 / 205) : 130
-    this.sendCommand('tap', { x: Math.max(0, Math.min(417, x)), y: Math.max(0, Math.min(259, y)) })
+  getImageTouch(event, useChanged) {
+    if (!event) return null
+    const list = useChanged ? event.changedTouches : event.touches
+    if (list && list.length) return list[0]
+    return event
+  },
+  imageTouchStart(event) {
+    const point = this.getImageTouch(event, false)
+    if (!point || point.offsetX === undefined || point.offsetY === undefined) {
+      this.touchStartX = -1
+      this.touchStartY = -1
+      return
+    }
+    this.touchStartX = point.offsetX
+    this.touchStartY = point.offsetY
+  },
+  imageTouchEnd(event) {
+    const point = this.getImageTouch(event, true)
+    if (!point || this.touchStartX < 0 || this.touchStartY < 0 ||
+        point.offsetX === undefined || point.offsetY === undefined) {
+      this.touchStartX = -1
+      this.touchStartY = -1
+      return
+    }
+    const dx = point.offsetX - this.touchStartX
+    const dy = point.offsetY - this.touchStartY
+    this.touchStartX = -1
+    this.touchStartY = -1
+
+    if (Math.abs(dy) >= 24 && Math.abs(dy) > Math.abs(dx)) {
+      const delta = Math.round(-dy * 260 / 205)
+      this.status = delta > 0 ? 'Scrolling down...' : 'Scrolling up...'
+      this.sendCommand('scroll', { delta: delta })
+      return
+    }
+    if (Math.abs(dx) <= 18 && Math.abs(dy) <= 18) {
+      const x = Math.round(point.offsetX * 418 / 300)
+      const y = Math.round(point.offsetY * 260 / 205)
+      this.status = 'Opening link...'
+      this.sendCommand('tap', {
+        x: Math.max(0, Math.min(417, x)),
+        y: Math.max(0, Math.min(259, y))
+      })
+    }
+  },
+  goBack() {
+    this.sendCommand('back')
+  },
+  goForward() {
+    this.sendCommand('forward')
+  },
+  reloadPage() {
+    this.sendCommand('reload')
   },
   checkConnection() {
     try {
