@@ -10,7 +10,7 @@ object PageLoader {
     fun load(input: String): WebPage {
         val normalized = if (input.startsWith("http://") || input.startsWith("https://")) input else "https://$input"
         val uri = URL(normalized)
-        require(uri.protocol == "https") { "Поддерживаются только HTTPS-сайты" }
+        require(uri.protocol == "https") { "Only HTTPS websites are supported" }
         val connection = (uri.openConnection() as HttpURLConnection).apply {
             connectTimeout = 12000
             readTimeout = 15000
@@ -20,11 +20,11 @@ object PageLoader {
         }
         try {
             connection.connect()
-            require(connection.url.protocol == "https") { "Перенаправление на HTTP запрещено" }
-            require(connection.responseCode in 200..299) { "Сайт ответил: HTTP ${connection.responseCode}" }
+            require(connection.url.protocol == "https") { "HTTP redirects are not allowed" }
+            require(connection.responseCode in 200..299) { "Website returned HTTP ${connection.responseCode}" }
             val type = connection.contentType.orEmpty()
             require(type.contains("text/html", true) || type.contains("application/xhtml", true)) {
-                "Этот тип страницы пока не поддерживается"
+                "This page type is not supported yet"
             }
             val html = connection.inputStream.bufferedReader(Charsets.UTF_8).use { reader ->
                 val out = StringBuilder()
@@ -40,7 +40,7 @@ object PageLoader {
             }
             val title = Regex("(?is)<title[^>]*>(.*?)</title>").find(html)?.groupValues?.get(1)
                 ?.replace(Regex("<[^>]+>"), " ")?.let { Html.fromHtml(it, Html.FROM_HTML_MODE_COMPACT).toString().trim() }
-                .orEmpty().ifBlank { uri.host ?: "Страница" }
+                .orEmpty().ifBlank { uri.host ?: "Page" }
             val cleaned = html.replace(Regex("(?is)<(script|style|noscript|svg|iframe)[^>]*>.*?</\\1>"), " ")
                 .replace(Regex("(?i)<(br|/p|/div|/li|/h[1-6]|/tr)[^>]*>"), "\\n")
                 .replace(Regex("(?is)<[^>]+>"), " ")
@@ -50,7 +50,7 @@ object PageLoader {
                 .replace(Regex(" *\\n *"), "\\n")
                 .replace(Regex("\\n{3,}"), "\\n\\n")
                 .trim()
-            require(text.isNotBlank()) { "На странице не найден читаемый текст" }
+            require(text.isNotBlank()) { "No readable text found on page" }
             return WebPage(uri.toString(), title, text.take(180_000))
         } finally {
             connection.disconnect()
