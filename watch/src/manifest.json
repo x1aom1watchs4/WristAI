@@ -13,6 +13,9 @@
     },
     {
       "name": "system.interconnect"
+    },
+    {
+      "name": "system.file"
     }
   ],
   "config": {
