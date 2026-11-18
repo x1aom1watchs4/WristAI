@@ -2,6 +2,8 @@ package com.wristbrowser
 
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.graphics.BitmapFactory
+import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
@@ -10,6 +12,7 @@ import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.webkit.CookieManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.*
@@ -24,9 +27,75 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import org.json.JSONObject
 import java.io.ByteArrayOutputStream
+import java.net.HttpURLConnection
+import java.net.URL
+import java.text.Normalizer
 
 class MainActivity : ComponentActivity() {
     private val mainHandler = Handler(Looper.getMainLooper())
+
+    private fun downloadAndCompressImage(rawUrl: String, pageUrl: String): ByteArray? {
+        var connection: HttpURLConnection? = null
+        try {
+            if (!rawUrl.startsWith("https://")) return null
+            connection = (URL(rawUrl).openConnection() as HttpURLConnection).apply {
+                connectTimeout = 7000
+                readTimeout = 9000
+                instanceFollowRedirects = true
+                setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android) AppleWebKit/537.36 Chrome/120 Mobile Safari/537.36")
+                setRequestProperty("Referer", pageUrl)
+                CookieManager.getInstance().getCookie(rawUrl)?.let { setRequestProperty("Cookie", it) }
+                setRequestProperty("Accept", "image/avif,image/webp,image/apng,image/*,*/*;q=0.8")
+            }
+            connection.connect()
+            if (connection.url.protocol != "https" || connection.responseCode !in 200..299) return null
+            if (!connection.contentType.orEmpty().startsWith("image/", ignoreCase = true)) return null
+            val output = ByteArrayOutputStream()
+            connection.inputStream.use { input ->
+                val buffer = ByteArray(8192)
+                var total = 0
+                while (true) {
+                    val count = input.read(buffer)
+                    if (count < 0) break
+                    total += count
+                    if (total > 1_500_000) return null
+                    output.write(buffer, 0, count)
+                }
+            }
+            val sourceBytes = output.toByteArray()
+            val bitmap = BitmapFactory.decodeByteArray(sourceBytes, 0, sourceBytes.size) ?: return null
+            if (bitmap.width < 100 || bitmap.height < 70) {
+                bitmap.recycle()
+                return null
+            }
+            val scale = minOf(320f / bitmap.width, 210f / bitmap.height, 1f)
+            val width = maxOf(1, (bitmap.width * scale).toInt())
+            val height = maxOf(1, (bitmap.height * scale).toInt())
+            val scaled = if (width != bitmap.width || height != bitmap.height) {
+                Bitmap.createScaledBitmap(bitmap, width, height, true)
+            } else bitmap
+            val rgb = Bitmap.createBitmap(width, height, Bitmap.Config.RGB_565)
+            Canvas(rgb).apply {
+                drawColor(Color.WHITE)
+                drawBitmap(scaled, 0f, 0f, null)
+            }
+            val compressed = ByteArrayOutputStream()
+            var quality = 72
+            do {
+                compressed.reset()
+                rgb.compress(Bitmap.CompressFormat.JPEG, quality, compressed)
+                quality -= 8
+            } while (compressed.size() > 72 * 1024 && quality >= 40)
+            if (scaled !== bitmap) scaled.recycle()
+            bitmap.recycle()
+            rgb.recycle()
+            return if (compressed.size() <= 80 * 1024) compressed.toByteArray() else null
+        } catch (_: Exception) {
+            return null
+        } finally {
+            connection?.disconnect()
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -45,36 +114,60 @@ class MainActivity : ComponentActivity() {
             fun captureAndSend(view: WebView) {
                 if (sendingImage) { capturePending = true; return }
                 sendingImage = true
-                status = "Preparing page content for watch..."
-                val script = "(function(){var links=Array.from(document.querySelectorAll('a[href]')).filter(function(a){return a.href&&a.href.indexOf('https://')===0;}).slice(0,40).map(function(a){return {title:((a.innerText||a.getAttribute('aria-label')||a.href).trim().replace(/\\s+/g,' ').slice(0,90)),url:a.href};}).filter(function(a){return a.title;});return JSON.stringify({title:document.title||location.hostname,url:location.href,text:(document.body&&document.body.innerText||'').slice(0,54000),links:links});})()"
+                status = "Preparing text and images for watch..."
+                val script = "(function(){var links=Array.from(document.querySelectorAll('a[href]')).filter(function(a){return a.href&&a.href.indexOf('https://')===0;}).slice(0,40).map(function(a){return {title:((a.innerText||a.getAttribute('aria-label')||a.href).trim().replace(/\\\\s+/g,' ').slice(0,90)),url:a.href};}).filter(function(a){return a.title;});var images=Array.from(document.images).filter(function(i){return i.complete&&i.naturalWidth>=100&&i.naturalHeight>=70;}).slice(0,3).map(function(i){return {url:i.currentSrc||i.src,title:(i.alt||i.title||'Изображение').trim().slice(0,80)};}).filter(function(i){return i.url&&i.url.indexOf('https://')===0;});return JSON.stringify({title:document.title||location.hostname,url:location.href,text:(document.body&&document.body.innerText||'').slice(0,54000),links:links,images:images});})()"
                 view.evaluateJavascript(script) { result ->
                     try {
-                        val encoded = org.json.JSONTokener(result ?: "\"\"").nextValue() as? String
+                        val encoded = org.json.JSONTokener(result ?: "\\"\\"").nextValue() as? String
                             ?: throw IllegalStateException("Empty page response")
                         val pageData = JSONObject(encoded)
+                        val normalizedText = Normalizer.normalize(pageData.optString("text", ""), Normalizer.Form.NFC)
                         val page = WebPage(
                             pageData.optString("url", view.url ?: ""),
                             pageData.optString("title", view.title ?: "Web page"),
-                            pageData.optString("text", "") +
-                                "\n\n__WRIST_LINKS__\n" +
+                            normalizedText + "\\n\\n__WRIST_LINKS__\\n" +
                                 (pageData.optJSONArray("links")?.toString() ?: "[]")
                         )
                         if (page.text.isBlank()) throw IllegalStateException("No readable page text")
-                        bridge.send(page) { message ->
-                            status = message
-                            if (message.contains("error", ignoreCase = true) ||
-                                message.contains("Could not", ignoreCase = true) ||
-                                message.contains("not connected", ignoreCase = true)) {
-                                sendingImage = false
+                        val imageCandidates = mutableListOf<Pair<String, String>>()
+                        val imageArray = pageData.optJSONArray("images")
+                        if (imageArray != null) {
+                            for (i in 0 until minOf(imageArray.length(), 3)) {
+                                val item = imageArray.optJSONObject(i) ?: continue
+                                val imageUrl = item.optString("url", "")
+                                if (imageUrl.startsWith("https://")) {
+                                    imageCandidates += (item.optString("title", "Изображение") to imageUrl)
+                                }
                             }
                         }
-                        mainHandler.postDelayed({
-                            sendingImage = false
-                            if (capturePending) {
-                                capturePending = false
-                                browserView?.let { captureAndSend(it) }
+                        Thread {
+                            val pageImages = imageCandidates.mapNotNull { (title, imageUrl) ->
+                                downloadAndCompressImage(imageUrl, page.url)?.let { PageImage(title, it) }
                             }
-                        }, 9000)
+                            runOnUiThread {
+                                status = if (pageImages.isEmpty()) {
+                                    "Sending page text and links..."
+                                } else {
+                                    "Sending page with ${pageImages.size} image(s)..."
+                                }
+                                bridge.send(page, pageImages) { message ->
+                                    runOnUiThread {
+                                        status = message
+                                        val finished = message.startsWith("All page data") ||
+                                            message.contains("error", ignoreCase = true) ||
+                                            message.contains("Could not", ignoreCase = true) ||
+                                            message.contains("not connected", ignoreCase = true)
+                                        if (finished) {
+                                            sendingImage = false
+                                            if (capturePending) {
+                                                capturePending = false
+                                                browserView?.let { captureAndSend(it) }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }.start()
                     } catch (error: Exception) {
                         sendingImage = false
                         status = "Could not prepare page: ${error.message ?: "unknown error"}"
@@ -267,6 +360,31 @@ class MainActivity : ComponentActivity() {
                                 modifier = Modifier.weight(1f)
                             ) { Text(if (sendingImage) "Sending..." else "Send page to Watch") }
                         }
+
+                        OutlinedButton(
+                            onClick = {
+                                sendingImage = true
+                                val testPage = WebPage(
+                                    "https://example.com/unicode-test",
+                                    "Проверка Unicode",
+                                    "Кириллица: Привет, мир! Ёжик, ЖЖ, Яя. Числа: 12345. Знаки: № ₽ © → • — …\\n" +
+                                        "Latin: café, naïve, Grüße. Emoji: 😀 🚀 🌍"
+                                )
+                                bridge.send(testPage, emptyList()) { message ->
+                                    runOnUiThread {
+                                        status = message
+                                        if (message.startsWith("All page data") ||
+                                            message.contains("error", ignoreCase = true) ||
+                                            message.contains("Could not", ignoreCase = true) ||
+                                            message.contains("not connected", ignoreCase = true)) {
+                                            sendingImage = false
+                                        }
+                                    }
+                                }
+                            },
+                            enabled = !sendingImage,
+                            modifier = Modifier.fillMaxWidth()
+                        ) { Text("Send Unicode test to Watch") }
 
                         Row(
                             modifier = Modifier.fillMaxWidth(),
