@@ -54,7 +54,7 @@ class WearableBridge(context: Context) {
         }
         val image = images[imageIndex]
         val encoded = Base64.encodeToString(image.jpeg, Base64.NO_WRAP)
-        val chunks = encoded.chunked(900)
+        val chunks = encoded.chunked(300)
         val transferId = UUID.randomUUID().toString()
         val start = JSONObject().put("protocol", 1).put("type", "browser_image_start")
             .put("id", transferId).put("title", image.title.take(120))
@@ -86,7 +86,7 @@ class WearableBridge(context: Context) {
             .put("id", transferId).put("index", index).put("data", chunks[index]).toString()
         sendPayload(nodeId, payload, {
             status("Image ${imageIndex + 1}/${images.size}: ${index + 1}/${chunks.size}")
-            Handler(Looper.getMainLooper()).postDelayed({ sendImagePart(nodeId, transferId, chunks, index + 1, imageIndex, images, status) }, 35)
+            Handler(Looper.getMainLooper()).postDelayed({ sendImagePart(nodeId, transferId, chunks, index + 1, imageIndex, images, status) }, 100)
         }, { status("Image chunk error ${index + 1}: $it") })
     }
 
@@ -227,13 +227,30 @@ class WearableBridge(context: Context) {
     }
 
     private fun sendPayload(id: String, value: String, success: () -> Unit, failure: (String) -> Unit) {
-        try {
-            Wearable.getMessageApi(app).sendMessage(id, value.toByteArray(StandardCharsets.UTF_8))
-                .addOnSuccessListener { success() }
-                .addOnFailureListener { failure(it.message ?: "error XMS") }
-        } catch (error: Throwable) {
-            failure(error.message ?: "error XMS")
+        val handler = Handler(Looper.getMainLooper())
+        val maxRetries = 3
+
+        fun attempt(retry: Int) {
+            try {
+                Wearable.getMessageApi(app).sendMessage(id, value.toByteArray(StandardCharsets.UTF_8))
+                    .addOnSuccessListener { success() }
+                    .addOnFailureListener { error ->
+                        if (retry < maxRetries) {
+                            handler.postDelayed({ attempt(retry + 1) }, 250L * (retry + 1))
+                        } else {
+                            failure(error.message ?: "error XMS (after $maxRetries retries)")
+                        }
+                    }
+            } catch (error: Throwable) {
+                if (retry < maxRetries) {
+                    handler.postDelayed({ attempt(retry + 1) }, 250L * (retry + 1))
+                } else {
+                    failure(error.message ?: "error XMS (after $maxRetries retries)")
+                }
+            }
         }
+
+        attempt(0)
     }
 
     private fun splitUtf8Safely(value: String, maxBytes: Int): List<String> {
