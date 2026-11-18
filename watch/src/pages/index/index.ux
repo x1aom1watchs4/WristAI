@@ -55,7 +55,7 @@ export default {
     status: 'Подключаемся к телефону…',
     pageTitle: 'Открой сайт в приложении на телефоне',
     pageUrl: '',
-    pageText: 'Здесь появится содержимое страницы. Подключение использует тот же канал Xiaomi, что и WristBook.',
+    pageText: 'Проверка кириллицы: Привет, мир! Ёё Жж Яя. Числа: 12345. Знаки: № ₽ © → • — …',
     pageLinks: [],
     query: '',
     keyboardVisible: false,
