@@ -38,11 +38,17 @@ class MainActivity : ComponentActivity() {
             var pageLoading by remember { mutableStateOf(false) }
             var pageReady by remember { mutableStateOf(false) }
             var pageProgress by remember { mutableIntStateOf(0) }
+            var sendAfterLoad by remember { mutableStateOf(false) }
+            var sendingImage by remember { mutableStateOf(false) }
 
             fun captureAndSend(view: WebView) {
+                if (sendingImage) return
+                sendingImage = true
+                status = "Preparing image for watch..."
                 mainHandler.postDelayed({
                     try {
                         if (view.width <= 0 || view.height <= 0) {
+                            sendingImage = false
                             status = "Preview is not ready yet. Open the page again."
                             return@postDelayed
                         }
@@ -61,14 +67,24 @@ class MainActivity : ComponentActivity() {
                         bridge.sendBrowserImage(
                             view.title?.ifBlank { view.url ?: "Web page" } ?: "Web page",
                             output.toByteArray()
-                        ) { message -> status = message }
+                        ) { message ->
+                            status = message
+                            if (message.startsWith("Transfer complete") ||
+                                message.contains("error", ignoreCase = true) ||
+                                message.contains("Could not", ignoreCase = true) ||
+                                message.startsWith("Watch not connected")) {
+                                sendingImage = false
+                            }
+                        }
                     } catch (e: Exception) {
+                        sendingImage = false
                         status = "Could not capture preview: ${e.message ?: "error"}"
                     }
-                }, 350)
+                }, 500)
             }
 
-            fun openBrowserUrl(raw: String) {
+            fun openBrowserUrl(raw: String, sendWhenReady: Boolean = false) {
+                sendAfterLoad = sendWhenReady
                 val target = raw.trim()
                 if (target.isBlank()) return
                 if (target.startsWith("http://", true)) {
@@ -97,6 +113,7 @@ class MainActivity : ComponentActivity() {
                             val command = JSONObject(raw)
                             when (command.optString("type")) {
                                 "browser_image_ack" -> {
+                                    sendingImage = false
                                     status = if (command.optBoolean("ok", false)) {
                                         "Watch confirmed: preview received and displayed."
                                     } else {
@@ -107,7 +124,7 @@ class MainActivity : ComponentActivity() {
                                     val query = command.optString("query").take(300)
                                     if (query.isNotBlank()) {
                                         address = query
-                                        openBrowserUrl(query)
+                                        openBrowserUrl(query, true)
                                     }
                                 }
                                 "tap" -> {
@@ -169,9 +186,9 @@ class MainActivity : ComponentActivity() {
 
                             OutlinedButton(
                                 onClick = { browserView?.let { captureAndSend(it) } },
-                                enabled = pageReady && !pageLoading && browserView != null,
+                                enabled = pageReady && !pageLoading && browserView != null && !sendingImage,
                                 modifier = Modifier.weight(1f)
-                            ) { Text("Send to Watch") }
+                            ) { Text(if (sendingImage) "Sending..." else "Send to Watch") }
                         }
 
                         Row(
@@ -224,8 +241,13 @@ class MainActivity : ComponentActivity() {
                                                 override fun onPageFinished(view: WebView, url: String) {
                                                     pageLoading = false
                                                     pageReady = true
-                                                    status = "Preview ready: ${view.title ?: url}"
-                                                    captureAndSend(view)
+                                                    if (sendAfterLoad) {
+                                                        sendAfterLoad = false
+                                                        status = "Search loaded. Sending to watch..."
+                                                        captureAndSend(view)
+                                                    } else {
+                                                        status = "Preview ready: ${view.title ?: url}"
+                                                    }
                                                 }
                                             }
                                             setBackgroundColor(android.graphics.Color.WHITE)
