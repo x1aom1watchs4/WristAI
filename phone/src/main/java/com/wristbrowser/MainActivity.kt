@@ -130,16 +130,53 @@ class MainActivity : ComponentActivity() {
                                 "tap" -> {
                                     val x = command.optDouble("x", -1.0).toInt().coerceIn(0, 417)
                                     val y = command.optDouble("y", -1.0).toInt().coerceIn(0, 259)
-                                    browserView?.evaluateJavascript(
-                                        "(function(){var e=document.elementFromPoint($x, $y);if(e){e.scrollIntoView({block:'center'});var a=e.closest('a,button,input,[role=button]');if(a){a.click();}else{e.click();}}})()",
-                                        null
-                                    )
-                                    browserView?.let { captureAndSend(it) }
+                                    val view = browserView
+                                    if (view != null && pageReady && !pageLoading) {
+                                        sendAfterLoad = true
+                                        val script = "(function(){var x=($x/418)*window.innerWidth;var y=($y/260)*window.innerHeight;var e=document.elementFromPoint(x,y);if(!e)return false;var a=e.closest('a,button,input,select,textarea,[role=button],[onclick]');(a||e).click();return true;})()"
+                                        view.evaluateJavascript(script, null)
+                                        mainHandler.postDelayed({
+                                            if (sendAfterLoad && pageReady && !pageLoading) {
+                                                sendAfterLoad = false
+                                                browserView?.let { captureAndSend(it) }
+                                            }
+                                        }, 1000)
+                                    }
                                 }
                                 "scroll" -> {
                                     val delta = command.optInt("delta", 300).coerceIn(-1200, 1200)
-                                    browserView?.evaluateJavascript("window.scrollBy(0,$delta)", null)
-                                    browserView?.let { captureAndSend(it) }
+                                    val view = browserView
+                                    if (view != null && pageReady && !pageLoading) {
+                                        view.evaluateJavascript("window.scrollBy({top:$delta,left:0,behavior:'instant'})", null)
+                                        mainHandler.postDelayed({
+                                            if (pageReady && !pageLoading) browserView?.let { captureAndSend(it) }
+                                        }, 250)
+                                    }
+                                }
+                                "back" -> {
+                                    val view = browserView
+                                    if (view != null && view.canGoBack()) {
+                                        sendAfterLoad = true
+                                        view.goBack()
+                                    } else {
+                                        status = "No previous page."
+                                    }
+                                }
+                                "forward" -> {
+                                    val view = browserView
+                                    if (view != null && view.canGoForward()) {
+                                        sendAfterLoad = true
+                                        view.goForward()
+                                    } else {
+                                        status = "No next page."
+                                    }
+                                }
+                                "reload" -> {
+                                    val view = browserView
+                                    if (view != null) {
+                                        sendAfterLoad = true
+                                        view.reload()
+                                    }
                                 }
                             }
                         } catch (_: Exception) {
