@@ -3,13 +3,13 @@
     <text class="brand">WristBrowser</text>
     <text class="status">{{status}}</text>
     <div class="searchRow">
-      <input class="query" type="text" value="{{query}}" placeholder="Что найти в Google?" @change="onQueryChange" />
-      <input type="button" class="searchButton" value="Найти" @click="search" />
+      <input class="query" type="text" value="{{query}}" placeholder="Search Google..." @change="onQueryChange" />
+      <input type="button" class="searchButton" value="Search" @click="search" />
     </div>
     <div class="controls">
       <input type="button" class="smallButton" value="▲" @click="scrollUp" />
       <input type="button" class="smallButton" value="▼" @click="scrollDown" />
-      <input type="button" class="smallButton" value="Связь" @click="checkConnection" />
+      <input type="button" class="smallButton" value="Connect" @click="checkConnection" />
     </div>
     <text class="heading">{{pageTitle}}</text>
     <image if="{{imageData}}" class="browserImage" src="{{imageData}}" @click="tapImage" @complete="onImageComplete" @error="onImageError" />
@@ -26,9 +26,9 @@ import file from '@system.file'
 let connection = null
 export default {
   private: {
-    status: 'Ожидание телефона',
-    pageTitle: 'Введи запрос для Google',
-    pageText: 'Результаты поиска и страницы будут показываться здесь как снимок сайта.',
+    status: 'Waiting for phone',
+    pageTitle: 'Enter a Google search',
+    pageText: 'Search results and web pages will appear here as website snapshots.',
     query: '',
     transferId: '',
     expected: 0,
@@ -43,16 +43,16 @@ export default {
   bindConnection() {
     try {
       connection = interconnect.instance()
-      connection.onopen = () => { this.status = 'Телефон подключён' }
-      connection.onclose = () => { this.status = 'Связь прервана' }
-      connection.onerror = (e) => { this.status = 'Ошибка связи: ' + (e && e.code !== undefined ? e.code : 'неизвестно') }
+      connection.onopen = () => { this.status = 'Phone connected' }
+      connection.onclose = () => { this.status = 'Connect прервана' }
+      connection.onerror = (e) => { this.status = 'Connection error: ' + (e && e.code !== undefined ? e.code : 'unknown') }
       connection.onmessage = (event) => {
         const raw = event && event.data !== undefined ? event.data : event
         this.handleMessage(raw)
       }
       this.checkConnection()
     } catch (e) {
-      this.status = 'Ошибка запуска связи'
+      this.status = 'Connection startup error'
     }
   },
   sendCommand(type, extra) {
@@ -65,10 +65,10 @@ export default {
       connection.send({
         data: data,
         success: () => {},
-        fail: () => { this.status = 'Не удалось отправить команду телефону' }
+        fail: () => { this.status = 'Could not send command to phone' }
       })
     } catch (e) {
-      this.status = 'Ошибка отправки команды'
+      this.status = 'Command send error'
     }
   },
   onQueryChange(event) {
@@ -77,12 +77,12 @@ export default {
   search() {
     const value = (this.query || '').trim()
     if (!value) {
-      this.status = 'Сначала введи запрос'
+      this.status = 'Enter a search first'
       return
     }
     this.imageData = ''
-    this.pageTitle = 'Поиск: ' + value
-    this.status = 'Ищу в Google…'
+    this.pageTitle = 'Search: ' + value
+    this.status = 'Searching Google...'
     this.sendCommand('search', { query: value })
   },
   scrollUp() {
@@ -92,11 +92,11 @@ export default {
     this.sendCommand('scroll', { delta: 320 })
   },
   onImageComplete(event) {
-    this.status = 'Картинка отображается. Можно нажимать по ссылкам и прокручивать.'
+    this.status = 'Image displayed. Tap links or scroll.'
     this.sendCommand('browser_image_ack', { id: this.transferId, ok: true })
   },
   onImageError() {
-    this.status = 'Файл получен, но часы не смогли декодировать JPEG.'
+    this.status = 'File received, but the watch could not decode the JPEG.'
     this.sendCommand('browser_image_ack', { id: this.transferId, ok: false, error: 'image decode failed' })
   },
   tapImage(event) {
@@ -110,12 +110,12 @@ export default {
       connection.diagnosis({
         timeout: 10000,
         success: (result) => {
-          this.status = result && result.status === 0 ? 'Телефон подключён' : 'Телефон не найден'
+          this.status = result && result.status === 0 ? 'Phone connected' : 'Phone not found'
         },
-        fail: () => { this.status = 'Не удалось проверить связь' }
+        fail: () => { this.status = 'Could not check connection' }
       })
     } catch (e) {
-      this.status = 'Ошибка проверки связи'
+      this.status = 'Connection check error'
     }
   },
   base64ToArrayBuffer(base64) {
@@ -140,14 +140,14 @@ export default {
 
     if (msg.type === 'browser_image_start') {
       if (!Number.isInteger(msg.chunks) || msg.chunks < 1 || msg.chunks > 256) {
-        this.status = 'Некорректный снимок'
+        this.status = 'Invalid image transfer'
         return
       }
       this.transferId = msg.id
       this.expected = msg.chunks
       this.chunks = []
       this.receivedCount = 0
-      this.imageTitle = typeof msg.title === 'string' ? msg.title.slice(0, 120) : 'Веб-страница'
+      this.imageTitle = typeof msg.title === 'string' ? msg.title.slice(0, 120) : 'Web page'
       this.pageTitle = this.imageTitle
       this.status = 'IMAGE START 0/' + this.expected
       return
@@ -159,10 +159,10 @@ export default {
       this.expected = msg.chunks
       this.chunks = []
       this.receivedCount = 0
-      this.pageTitle = typeof msg.title === 'string' ? msg.title.slice(0, 160) : 'Веб-страница'
+      this.pageTitle = typeof msg.title === 'string' ? msg.title.slice(0, 160) : 'Web page'
       this.pageText = ''
       this.imageData = ''
-      this.status = 'Получаю текст: 0/' + this.expected
+      this.status = 'Receiving text: 0/' + this.expected
       return
     }
 
@@ -176,7 +176,7 @@ export default {
     }
     if (msg.type === 'browser_image_end') {
       if (this.receivedCount !== this.expected) {
-        this.status = 'Снимок неполный: ' + this.receivedCount + '/' + this.expected
+        this.status = 'Incomplete image: ' + this.receivedCount + '/' + this.expected
         return
       }
       let encoded = ''
@@ -191,15 +191,15 @@ export default {
           buffer: buffer,
           success: () => {
             this.imageData = 'internal://files/wristbrowser-screen.jpg'
-            this.status = 'Файл сохранён. Ожидаю отображения…'
+            this.status = 'File saved. Waiting for display...'
           },
           fail: (e, code) => {
-            this.status = 'Ошибка сохранения снимка: ' + code
-            this.sendCommand('browser_image_ack', { id: this.transferId, ok: false, error: String(code || 'ошибка файла') })
+            this.status = 'Image save error: ' + code
+            this.sendCommand('browser_image_ack', { id: this.transferId, ok: false, error: String(code || 'error файла') })
           }
         })
       } catch (e) {
-        this.status = 'Не удалось обработать изображение'
+        this.status = 'Could not process image'
       }
       return
     }
@@ -208,7 +208,7 @@ export default {
       if (!Number.isInteger(msg.index) || msg.index < 0 || msg.index >= this.expected || typeof msg.text !== 'string') return
       if (this.chunks[msg.index] === undefined) this.receivedCount++
       this.chunks[msg.index] = msg.text
-      this.status = 'Текст: ' + this.receivedCount + '/' + this.expected
+      this.status = 'Text: ' + this.receivedCount + '/' + this.expected
       return
     }
     if (msg.type === 'page_end') {
@@ -223,8 +223,8 @@ export default {
         uri: 'internal://files/wristbrowser-page.txt',
         text: complete,
         encoding: 'UTF-8',
-        success: () => { this.status = 'Текстовая страница получена и сохранена' },
-        fail: (e, code) => { this.status = 'Ошибка сохранения: ' + code }
+        success: () => { this.status = 'Text page received and saved' },
+        fail: (e, code) => { this.status = 'Save error: ' + code }
       })
     }
   }
