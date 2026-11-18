@@ -14,7 +14,7 @@
     <text class="heading">{{pageTitle}}</text>
     <text class="url">{{pageUrl}}</text>
     <div if="{{!keyboardVisible}}" class="readerArea">
-      <scroll class="reader">
+      <scroll class="reader" scroll-y="true" scroll-x="false">
         <text class="body">{{pageText}}</text>
         <div class="linkList">
           <text class="link" for="{{item in pageLinks}}" @click="openLink(item.url)">{{item.title}}</text>
@@ -41,7 +41,7 @@
       </div>
       <text class="cancel" @click="hideKeyboard">CLOSE</text>
     </div>
-    <text class="hint">Страницы и текст приходят с телефона. Интернет часов не требуется.</text>
+    <text class="hint">Листай текст пальцем вверх и вниз прямо на часах</text>
   </div>
 </template>
 
