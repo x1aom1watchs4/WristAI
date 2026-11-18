@@ -54,7 +54,7 @@ class MainActivity : ComponentActivity() {
                         val output = ByteArrayOutputStream()
                         bitmap.compress(Bitmap.CompressFormat.JPEG, 58, output)
                         bitmap.recycle()
-                        bridge.sendBrowserImage(view.title.ifBlank { view.url ?: "Веб-страница" }, output.toByteArray()) {
+                        bridge.sendBrowserImage(view.title?.ifBlank { view.url ?: "Веб-страница" } ?: "Веб-страница", output.toByteArray()) {
                             status = it
                         }
                     } catch (e: Exception) {
