@@ -68,56 +68,70 @@ export default {
   runDiagnostics() {
     this.networkStatus = 'Checking network and phone bridge...'
     const results = []
+    const update = () => { this.networkStatus = results.join(' | ') }
     try {
-      network.getType({
-        success: (data) => {
-          results.push('Network: ' + String(data && data.type || 'unknown'))
-          this.networkStatus = results.join(' | ')
-        },
-        fail: (data, code) => {
-          results.push('Network API error ' + String(code || '') + ': ' + String(data || ''))
-          this.networkStatus = results.join(' | ')
-        }
-      })
+      if (!network || typeof network.getType !== 'function') {
+        results.push('Network API unavailable')
+        update()
+      } else {
+        network.getType({
+          success: (data) => { results.push('Network: ' + String(data && data.type || 'unknown')); update() },
+          fail: (data, code) => { results.push('Network API error ' + String(code || '') + ': ' + String(data || '')); update() }
+        })
+      }
     } catch (error) {
       results.push('Network API exception: ' + String(error))
-      this.networkStatus = results.join(' | ')
+      update()
     }
     try {
-      const connect = interconnect.instance()
-      connect.diagnosis({
-        timeout: 8000,
-        success: (data) => {
-          const labels = {0: 'connected', 204: 'timeout', 1001: 'phone app missing', 1000: 'other error'}
-          results.push('Phone bridge: ' + String(labels[data && data.status] || data && data.status || 'unknown'))
-          this.networkStatus = results.join(' | ')
-        },
-        fail: (data, code) => {
-          results.push('Phone bridge error ' + String(code || '') + ': ' + String(data || ''))
-          this.networkStatus = results.join(' | ')
+      if (!interconnect || typeof interconnect.instance !== 'function') {
+        results.push('Phone bridge API unavailable: interconnect.instance is not a function')
+        update()
+      } else {
+        const connect = interconnect.instance()
+        if (!connect) {
+          results.push('Phone bridge unavailable: no connection instance')
+          update()
+        } else if (typeof connect.diagnosis === 'function') {
+          connect.diagnosis({
+            timeout: 8000,
+            success: (data) => {
+              const labels = {0: 'connected', 204: 'timeout', 1001: 'phone app missing', 1000: 'other error'}
+              results.push('Phone bridge diagnosis: ' + String(labels[data && data.status] || (data && data.status) || 'unknown'))
+              update()
+            },
+            fail: (data, code) => { results.push('Phone bridge diagnosis error ' + String(code || '') + ': ' + String(data || '')); update() }
+          })
+        } else if (typeof connect.getReadyState === 'function') {
+          connect.getReadyState({
+            success: (data) => { results.push('Phone bridge readyState: ' + String(data && data.status)); update() },
+            fail: (data, code) => { results.push('Phone bridge state error ' + String(code || '') + ': ' + String(data || '')); update() }
+          })
+        } else {
+          results.push('Phone bridge instance found, but diagnosis/getReadyState are unavailable')
+          update()
         }
-      })
+      }
     } catch (error) {
       results.push('Phone bridge exception: ' + String(error))
-      this.networkStatus = results.join(' | ')
+      update()
     }
     try {
-      fetch.fetch({
-        url: 'https://example.com',
-        method: 'GET',
-        responseType: 'text',
-        success: (response) => {
-          results.push('HTTPS test: HTTP ' + String(response && response.code || 'unknown'))
-          this.networkStatus = results.join(' | ')
-        },
-        fail: (data, code) => {
-          results.push('HTTPS test failed: ' + String(code || '') + ' ' + String(data || ''))
-          this.networkStatus = results.join(' | ')
-        }
-      })
+      if (!fetch || typeof fetch.fetch !== 'function') {
+        results.push('Fetch API unavailable')
+        update()
+      } else {
+        fetch.fetch({
+          url: 'https://example.com',
+          method: 'GET',
+          responseType: 'text',
+          success: (response) => { results.push('HTTPS test: HTTP ' + String(response && response.code || 'unknown')); update() },
+          fail: (data, code) => { results.push('HTTPS test failed: ' + String(code || '') + ' ' + String(data || '')); update() }
+        })
+      }
     } catch (error) {
       results.push('HTTPS test exception: ' + String(error))
-      this.networkStatus = results.join(' | ')
+      update()
     }
   },
   showKeyboard() {
