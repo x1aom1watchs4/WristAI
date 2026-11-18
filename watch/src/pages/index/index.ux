@@ -191,7 +191,7 @@ export default {
 .url { width: 420px; color: #91a1ad; font-size: 10px; max-lines: 1; margin-bottom: 5px; }
 .readerArea { width: 420px; height: 285px; }
 .reader { width: 420px; height: 285px; }
-.body { width: 410px; color: #e2e8ed; font-size: 17px; line-height: 1.35; }
+.body { width: 410px; color: #e2e8ed; font-size: 17px; }
 .linkList { width: 410px; flex-direction: column; margin-top: 8px; }
 .link { width: 405px; color: #8ed6c5; font-size: 15px; padding: 8px 4px; border-bottom: 1px solid #344653; }
 .hint { width: 420px; color: #8797a3; font-size: 10px; text-align: center; margin-top: 5px; }
