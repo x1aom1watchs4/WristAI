@@ -76,9 +76,18 @@ jobs:
           APK="$(find phone/build/outputs/apk/release -type f -name '*.apk' -print -quit)"
           test -n "$APK"
           EXPECTED="$(openssl x509 -in phone/sign/certificate.pem -noout -fingerprint -sha256 | cut -d= -f2 | tr -d ':' | tr '[:upper:]' '[:lower:]')"
-          ACTUAL="$(keytool -printcert -jarfile "$APK" | awk -F': ' '/SHA256:/ {print $2}' | tr -d ':' | tr '[:upper:]' '[:lower:]')"
+          SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
+          test -n "$SDK_ROOT"
+          APKSIGNER="$(find "$SDK_ROOT/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
+          test -x "$APKSIGNER"
+          ACTUAL="$("$APKSIGNER" verify --print-certs "$APK" | awk -F': ' '/certificate SHA-256 digest:/ {print $2}' | tr -d ':' | tr '[:upper:]' '[:lower:]')"
           test -n "$ACTUAL"
-          test "$EXPECTED" = "$ACTUAL"
+          if [ "$EXPECTED" != "$ACTUAL" ]; then
+            echo "APK certificate fingerprint does not match the Vela certificate."
+            echo "Expected: $EXPECTED"
+            echo "Actual:   $ACTUAL"
+            exit 1
+          fi
           echo "Verified: Android APK and Vela RPK use the same SHA-256 certificate."
       - uses: actions/upload-artifact@v4
         if: steps.android-signing.outputs.ready == 'true'
