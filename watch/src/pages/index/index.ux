@@ -16,6 +16,9 @@
     <div if="{{!keyboardVisible}}" class="readerArea">
       <scroll class="reader">
         <text class="body">{{pageText}}</text>
+        <div class="linkList">
+          <text class="link" for="{{item in pageLinks}}" @click="openLink(item.url)">{{item.title}}</text>
+        </div>
       </scroll>
     </div>
     <div if="{{keyboardVisible}}" class="keyboard">
@@ -53,6 +56,7 @@ export default {
     pageTitle: 'Открой сайт в приложении на телефоне',
     pageUrl: '',
     pageText: 'Здесь появится содержимое страницы. Подключение использует тот же канал Xiaomi, что и WristBook.',
+    pageLinks: [],
     query: '',
     keyboardVisible: false,
     transferId: '',
@@ -103,6 +107,7 @@ export default {
       this.chunks = []
       this.received = 0
       this.pageText = ''
+      this.pageLinks = []
       this.status = 'Получаем страницу…'
     } else if (message.type === 'page_chunk') {
       if (message.id !== this.transferId) return
@@ -111,7 +116,20 @@ export default {
       this.status = 'Загрузка страницы: ' + this.received + '/' + this.expectedChunks
     } else if (message.type === 'page_end') {
       if (message.id !== this.transferId) return
-      this.pageText = this.chunks.join('')
+      const content = this.chunks.join('')
+      const marker = '\n\n__WRIST_LINKS__\n'
+      const markerIndex = content.indexOf(marker)
+      if (markerIndex >= 0) {
+        this.pageText = content.slice(0, markerIndex)
+        try {
+          this.pageLinks = JSON.parse(content.slice(markerIndex + marker.length)) || []
+        } catch (error) {
+          this.pageLinks = []
+        }
+      } else {
+        this.pageText = content
+        this.pageLinks = []
+      }
       this.status = 'Страница загружена'
       this.sendCommand('page_ack', {id: this.transferId, ok: true})
     } else if (message.type === 'transfer_error') {
@@ -129,6 +147,15 @@ export default {
     })
   },
 
+  openLink(url) {
+    const target = String(url || '')
+    if (!target || target.indexOf('https://') !== 0) {
+      this.status = 'Эта ссылка не поддерживается'
+      return
+    }
+    this.sendCommand('open_link', {url: target})
+    this.status = 'Открываем ссылку…'
+  },
   showKeyboard() { this.keyboardVisible = true },
   hideKeyboard() { this.keyboardVisible = false },
   appendKey(key) { this.query = String(this.query || '') + String(key || '') },
@@ -165,6 +192,8 @@ export default {
 .readerArea { width: 420px; height: 285px; }
 .reader { width: 420px; height: 285px; }
 .body { width: 410px; color: #e2e8ed; font-size: 17px; line-height: 1.35; }
+.linkList { width: 410px; flex-direction: column; margin-top: 8px; }
+.link { width: 405px; color: #8ed6c5; font-size: 15px; padding: 8px 4px; border-bottom: 1px solid #344653; }
 .hint { width: 420px; color: #8797a3; font-size: 10px; text-align: center; margin-top: 5px; }
 .keyboard { width: 430px; flex-direction: column; align-items: center; }
 .typed { width: 410px; height: 38px; color: #ffffff; background-color: #263440; font-size: 16px; text-align: center; padding: 8px; margin-bottom: 5px; }
