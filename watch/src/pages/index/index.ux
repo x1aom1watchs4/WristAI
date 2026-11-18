@@ -2,19 +2,40 @@
   <div class="page">
     <text class="brand">WristBrowser</text>
     <text class="status">{{status}}</text>
-    <div class="searchRow">
-      <input class="query" type="text" value="{{query}}" placeholder="Search or enter URL" @change="onQueryChange" />
-      <input type="button" class="searchButton" value="GO" @click="openQuery" />
+
+    <div if="{{!keyboardVisible}}" class="browser">
+      <text class="searchBox" @click="showKeyboard">{{query || 'Нажми здесь для поиска'}}</text>
+      <div class="controls">
+        <input type="button" class="searchButton" value="GO" @click="openQuery" />
+        <input type="button" class="smallButton" value="BACK" @click="goBack" />
+        <input type="button" class="smallButton" value="NEXT" @click="goForward" />
+      </div>
+      <text class="heading">{{pageTitle}}</text>
+      <scroll class="reader">
+        <text class="body">{{pageText}}</text>
+      </scroll>
     </div>
-    <div class="controls">
-      <input type="button" class="smallButton" value="BACK" @click="goBack" />
-      <input type="button" class="smallButton" value="FORWARD" @click="goForward" />
-      <input type="button" class="smallButton" value="RELOAD" @click="reloadPage" />
+
+    <div if="{{keyboardVisible}}" class="keyboard">
+      <text class="typed" @click="hideKeyboard">{{query}}_</text>
+      <div class="keyRow">
+        <text class="key" for="{{item in row1}}" @click="appendKey(item)">{{item}}</text>
+      </div>
+      <div class="keyRow">
+        <text class="key" for="{{item in row2}}" @click="appendKey(item)">{{item}}</text>
+      </div>
+      <div class="keyRow">
+        <text class="key" for="{{item in row3}}" @click="appendKey(item)">{{item}}</text>
+        <text class="key special" @click="deleteKey">⌫</text>
+      </div>
+      <div class="keyRow bottomRow">
+        <text class="key special" @click="appendKey('.')">.</text>
+        <text class="key spaceKey" @click="appendKey(' ')">SPACE</text>
+        <text class="key special" @click="appendKey('/')">/</text>
+        <text class="key goKey" @click="submitKeyboard">GO</text>
+      </div>
+      <text class="cancel" @click="hideKeyboard">CLOSE KEYBOARD</text>
     </div>
-    <text class="heading">{{pageTitle}}</text>
-    <scroll class="reader">
-      <text class="body">{{pageText}}</text>
-    </scroll>
   </div>
 </template>
 
@@ -25,15 +46,32 @@ export default {
   private: {
     status: 'Ready — direct watch connection',
     pageTitle: 'Search the web',
-    pageText: 'Enter a search or website above. Pages are requested directly by the watch. Scroll this area to read.',
+    pageText: 'Tap the search field to open the on-screen keyboard.',
     query: '',
     currentUrl: '',
     history: [],
     historyIndex: -1,
-    requestNumber: 0
+    requestNumber: 0,
+    keyboardVisible: false,
+    row1: ['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'],
+    row2: ['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L'],
+    row3: ['Z', 'X', 'C', 'V', 'B', 'N', 'M']
   },
-  onQueryChange(event) {
-    this.query = event && event.value !== undefined ? event.value : this.query
+  showKeyboard() {
+    this.keyboardVisible = true
+  },
+  hideKeyboard() {
+    this.keyboardVisible = false
+  },
+  appendKey(key) {
+    this.query = String(this.query || '') + String(key || '')
+  },
+  deleteKey() {
+    this.query = String(this.query || '').slice(0, -1)
+  },
+  submitKeyboard() {
+    this.keyboardVisible = false
+    this.openQuery()
   },
   normalizeUrl(value) {
     const input = String(value || '').trim()
@@ -48,8 +86,10 @@ export default {
     const url = this.normalizeUrl(this.query)
     if (!url) {
       this.status = 'Enter a search or website'
+      this.keyboardVisible = true
       return
     }
+    this.keyboardVisible = false
     this.history = this.history.slice(0, this.historyIndex + 1)
     this.history.push(url)
     this.historyIndex = this.history.length - 1
@@ -146,19 +186,28 @@ export default {
   height: 466px;
   flex-direction: column;
   align-items: center;
-  padding: 24px 0px 18px;
+  padding: 18px 0px 12px;
   box-sizing: border-box;
   background-color: #101820;
   font-family: sans-serif;
 }
 .brand { color: #8ed6c5; font-size: 18px; font-weight: bold; margin-bottom: 3px; }
 .status { width: 300px; color: #9aa7b2; font-size: 11px; margin-bottom: 7px; text-align: center; }
-.searchRow { width: 300px; height: 42px; flex-direction: row; margin-bottom: 7px; }
-.query { width: 222px; height: 40px; color: #ffffff; background-color: #263440; font-size: 13px; }
-.searchButton { width: 70px; height: 40px; color: #101820; background-color: #8ed6c5; font-size: 13px; margin-left: 8px; }
-.controls { width: 300px; height: 34px; flex-direction: row; justify-content: space-between; margin-bottom: 6px; }
-.smallButton { width: 94px; height: 32px; color: #101820; background-color: #8ed6c5; font-size: 12px; }
+.browser { width: 300px; flex-direction: column; align-items: center; }
+.searchBox { width: 300px; height: 42px; padding: 10px 8px; color: #ffffff; background-color: #263440; font-size: 14px; text-align: center; margin-bottom: 7px; }
+.controls { width: 300px; height: 36px; flex-direction: row; justify-content: space-between; margin-bottom: 6px; }
+.searchButton { width: 66px; height: 34px; color: #101820; background-color: #8ed6c5; font-size: 12px; }
+.smallButton { width: 70px; height: 34px; color: #101820; background-color: #8ed6c5; font-size: 11px; }
 .heading { width: 300px; color: #ffffff; font-size: 13px; font-weight: bold; margin-bottom: 5px; text-align: center; }
 .reader { width: 300px; height: 300px; }
 .body { color: #e2e8ed; font-size: 15px; line-height: 1.35; }
+.keyboard { width: 450px; flex-direction: column; align-items: center; margin-top: 8px; }
+.typed { width: 420px; min-height: 44px; color: #ffffff; background-color: #263440; font-size: 17px; text-align: center; padding: 10px 6px; margin-bottom: 12px; }
+.keyRow { width: 440px; height: 52px; flex-direction: row; justify-content: center; align-items: center; margin-bottom: 7px; }
+.key { min-width: 34px; height: 46px; color: #ffffff; background-color: #344653; font-size: 17px; text-align: center; padding: 12px 4px; margin-left: 2px; margin-right: 2px; border-radius: 6px; }
+.special { background-color: #526675; }
+.spaceKey { width: 115px; font-size: 12px; }
+.goKey { width: 54px; color: #101820; background-color: #8ed6c5; font-size: 14px; }
+.bottomRow .key { min-width: 38px; }
+.cancel { color: #9aa7b2; font-size: 12px; padding: 8px; }
 </style>
