@@ -36,7 +36,7 @@ class MainActivity : ComponentActivity() {
             val bridge = remember { WearableBridge(applicationContext) }
             var address by remember { mutableStateOf("https://example.com") }
             var page by remember { mutableStateOf<WebPage?>(null) }
-            var status by remember { mutableStateOf("Проверяем связь с часами…") }
+            var status by remember { mutableStateOf("Checking watch connection...") }
             var busy by remember { mutableStateOf(false) }
             var browserView by remember { mutableStateOf<WebView?>(null) }
 
@@ -54,11 +54,11 @@ class MainActivity : ComponentActivity() {
                         val output = ByteArrayOutputStream()
                         bitmap.compress(Bitmap.CompressFormat.JPEG, 45, output)
                         bitmap.recycle()
-                        bridge.sendBrowserImage(view.title?.ifBlank { view.url ?: "Веб-страница" } ?: "Веб-страница", output.toByteArray()) {
+                        bridge.sendBrowserImage(view.title?.ifBlank { view.url ?: "Web page" } ?: "Web page", output.toByteArray()) {
                             status = it
                         }
                     } catch (e: Exception) {
-                        status = "Не удалось сделать снимок: ${e.message ?: "ошибка"}"
+                        status = "Could not capture page: ${e.message ?: "error"}"
                     }
                 }, 650)
             }
@@ -70,11 +70,11 @@ class MainActivity : ComponentActivity() {
                     "https://www.google.com/search?q=" + Uri.encode(target)
                 } else "https://$target"
                 if (!url.startsWith("https://")) {
-                    status = "Разрешены только HTTPS-страницы"
+                    status = "Only HTTPS pages are supported"
                     return
                 }
                 browserView?.loadUrl(url)
-                status = "Открываю: $url"
+                status = "Opening: $url"
             }
 
             LaunchedEffect(Unit) {
@@ -85,9 +85,9 @@ class MainActivity : ComponentActivity() {
                             when (command.optString("type")) {
                                 "browser_image_ack" -> {
                                     status = if (command.optBoolean("ok", false)) {
-                                        "Часы подтвердили: изображение сохранено и показано."
+                                        "Watch confirmed: image saved and displayed."
                                     } else {
-                                        "Часы не смогли сохранить изображение: " + command.optString("error", "неизвестная ошибка")
+                                        "Watch could not save image: " + command.optString("error", "неизвестная error")
                                     }
                                 }
                                 "search" -> {
@@ -110,7 +110,7 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
                         } catch (_: Exception) {
-                            status = "Не удалось обработать команду с часов"
+                            status = "Could not process command from watch"
                         }
                     }
                 }
@@ -125,17 +125,17 @@ class MainActivity : ComponentActivity() {
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         Text("WristBrowser", style = MaterialTheme.typography.headlineMedium)
-                        Text("Поиск и веб-страницы на Xiaomi Watch S4")
+                        Text("Search and web pages on Xiaomi Watch S4")
                         OutlinedTextField(
                             value = address, onValueChange = { address = it },
-                            label = { Text("Сайт или поисковый запрос") }, singleLine = true,
+                            label = { Text("Website or search query") }, singleLine = true,
                             modifier = Modifier.fillMaxWidth()
                         )
                         Button(
                             enabled = address.isNotBlank(),
                             onClick = { openBrowserUrl(address) },
                             modifier = Modifier.fillMaxWidth()
-                        ) { Text("Открыть в браузере часов") }
+                        ) { Text("Open on watch") }
                         AndroidView(
                             modifier = Modifier.fillMaxWidth().height(300.dp),
                             factory = { context ->
@@ -151,7 +151,7 @@ class MainActivity : ComponentActivity() {
                                             return request.url.scheme != "https"
                                         }
                                         override fun onPageFinished(view: WebView, url: String) {
-                                            status = "Страница готова: ${view.title}"
+                                            status = "Page ready: ${view.title}"
                                             captureAndSend(view)
                                         }
                                     }
@@ -161,7 +161,7 @@ class MainActivity : ComponentActivity() {
                             update = { browserView = it }
                         )
                         Text(status, style = MaterialTheme.typography.bodyMedium)
-                        Text("Снимок страницы автоматически отправляется на часы. Нажатия и прокрутка с часов управляют этой страницей.")
+                        Text("Page snapshots are sent to the watch. Taps and scrolling on the watch control this page.")
                         page?.let { loaded ->
                             HorizontalDivider()
                             Text(loaded.title, style = MaterialTheme.typography.titleLarge)
@@ -177,7 +177,7 @@ class MainActivity : ComponentActivity() {
                                     }
                                 },
                                 modifier = Modifier.fillMaxWidth()
-                            ) { Text("Передать текстовую версию") }
+                            ) { Text("Send text version") }
                         }
                     }
                 }
