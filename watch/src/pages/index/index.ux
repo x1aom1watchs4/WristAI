@@ -16,6 +16,9 @@
     <div if="{{!keyboardVisible}}" class="readerArea">
       <scroll class="reader" scroll-y="true" scroll-x="false">
         <text class="body">{{pageText}}</text>
+        <div class="imageList" if="{{pageImages.length > 0}}">
+          <image for="{{item in pageImages}}" src="{{item.uri}}" class="pageImage" />
+        </div>
         <div class="linkList">
           <text class="link" for="{{item in pageLinks}}" @click="openLink(item.url)">{{item.title}}</text>
         </div>
@@ -47,6 +50,7 @@
 
 <script>
 import interconnect from '@system.interconnect'
+import file from '@system.file'
 
 let connection = null
 
@@ -55,8 +59,14 @@ export default {
     status: 'Подключаемся к телефону…',
     pageTitle: 'Открой сайт в приложении на телефоне',
     pageUrl: '',
-    pageText: 'Проверка кириллицы: Привет, мир! Ёё Жж Яя. Числа: 12345. Знаки: № ₽ © → • — …',
+    pageText: 'Unicode-тест: Привет, мир! Ёё Жж Яя. Числа: 12345. Знаки: № ₽ © → • — … Эмодзи: 😀 🚀',
     pageLinks: [],
+    pageImages: [],
+    imageTransferId: '',
+    imageTitle: '',
+    imageExpectedChunks: 0,
+    imageChunks: [],
+    imageReceivedChunks: 0,
     query: '',
     keyboardVisible: false,
     transferId: '',
@@ -108,6 +118,10 @@ export default {
       this.received = 0
       this.pageText = ''
       this.pageLinks = []
+      this.pageImages.forEach((item) => {
+        file.delete({uri: item.uri, success: () => {}, fail: () => {}})
+      })
+      this.pageImages = []
       this.status = 'Получаем страницу…'
     } else if (message.type === 'page_chunk') {
       if (message.id !== this.transferId) return
@@ -132,9 +146,68 @@ export default {
       }
       this.status = 'Страница загружена'
       this.sendCommand('page_ack', {id: this.transferId, ok: true})
+    } else if (message.type === 'browser_image_start') {
+      this.imageTransferId = String(message.id || '')
+      this.imageTitle = String(message.title || 'Изображение')
+      this.imageExpectedChunks = Number(message.chunks || 0)
+      this.imageChunks = []
+      this.imageReceivedChunks = 0
+      this.status = 'Получаем изображение…'
+    } else if (message.type === 'browser_image_chunk') {
+      if (message.id !== this.imageTransferId) return
+      const index = Number(message.index)
+      if (index < 0 || index >= this.imageExpectedChunks) return
+      this.imageChunks[index] = message.data || ''
+      this.imageReceivedChunks = this.imageChunks.filter((part) => typeof part === 'string').length
+      this.status = 'Изображение: ' + this.imageReceivedChunks + '/' + this.imageExpectedChunks
+    } else if (message.type === 'browser_image_end') {
+      if (message.id !== this.imageTransferId) return
+      if (!this.imageExpectedChunks || this.imageReceivedChunks !== this.imageExpectedChunks) {
+        this.sendCommand('browser_image_ack', {id: this.imageTransferId, ok: false, error: 'Не все части изображения получены'})
+        this.status = 'Изображение получено не полностью'
+        return
+      }
+      const base64 = this.imageChunks.join('')
+      const safeId = this.imageTransferId.replace(/[^a-zA-Z0-9_-]/g, '')
+      const uri = 'internal://cache/wristbrowser-' + safeId + '.jpg'
+      file.writeArrayBuffer({
+        uri: uri,
+        buffer: this.base64ToUint8Array(base64),
+        success: () => {
+          this.pageImages = this.pageImages.concat([{uri: uri, title: this.imageTitle}])
+          this.sendCommand('browser_image_ack', {id: this.imageTransferId, ok: true})
+          this.status = 'Изображение добавлено на страницу'
+          this.imageChunks = []
+        },
+        fail: (error, code) => {
+          this.sendCommand('browser_image_ack', {id: this.imageTransferId, ok: false, error: 'file error ' + String(code || '')})
+          this.status = 'Не удалось сохранить изображение'
+          this.imageChunks = []
+        }
+      })
     } else if (message.type === 'transfer_error') {
       this.status = message.message || 'Ошибка передачи страницы'
     }
+  },
+
+  base64ToUint8Array(base64) {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
+    const len = base64.length
+    let size = Math.floor((len * 3) / 4)
+    if (base64[len - 1] === '=') size--
+    if (base64[len - 2] === '=') size--
+    const output = new Uint8Array(size)
+    let position = 0
+    for (let i = 0; i < len; i += 4) {
+      const a = chars.indexOf(base64[i])
+      const b = chars.indexOf(base64[i + 1])
+      const cc = base64[i + 2] === '=' ? 0 : chars.indexOf(base64[i + 2])
+      const d = base64[i + 3] === '=' ? 0 : chars.indexOf(base64[i + 3])
+      if (position < size) output[position++] = (a << 2) | (b >> 4)
+      if (position < size) output[position++] = ((b & 15) << 4) | (cc >> 2)
+      if (position < size) output[position++] = ((cc & 3) << 6) | d
+    }
+    return output
   },
 
   sendCommand(type, extra) {
@@ -192,6 +265,8 @@ export default {
 .readerArea { width: 420px; height: 285px; }
 .reader { width: 420px; height: 285px; }
 .body { width: 410px; color: #e2e8ed; font-size: 17px; }
+.imageList { width: 410px; flex-direction: column; align-items: center; margin-top: 8px; margin-bottom: 8px; }
+.pageImage { width: 380px; height: 210px; object-fit: contain; margin-bottom: 8px; }
 .linkList { width: 410px; flex-direction: column; margin-top: 8px; }
 .link { width: 405px; color: #8ed6c5; font-size: 15px; padding: 8px 4px; border-bottom: 1px solid #344653; }
 .hint { width: 420px; color: #8797a3; font-size: 10px; text-align: center; margin-top: 5px; }
