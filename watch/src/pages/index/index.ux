@@ -2,11 +2,20 @@
   <div class="page">
     <text class="brand">WristBrowser</text>
     <text class="status">{{status}}</text>
+    <div class="searchRow">
+      <input class="query" type="text" value="{{query}}" placeholder="Что найти в Google?" @change="onQueryChange" />
+      <input type="button" class="searchButton" value="Найти" @click="search" />
+    </div>
+    <div class="controls">
+      <input type="button" class="smallButton" value="▲" @click="scrollUp" />
+      <input type="button" class="smallButton" value="▼" @click="scrollDown" />
+      <input type="button" class="smallButton" value="Связь" @click="checkConnection" />
+    </div>
     <text class="heading">{{pageTitle}}</text>
-    <scroll class="reader">
+    <image if="{{imageData}}" class="browserImage" src="{{imageData}}" @click="tapImage" />
+    <scroll if="{{!imageData}}" class="reader">
       <text class="body">{{pageText}}</text>
     </scroll>
-    <input type="button" class="button" value="Проверить связь" @click="checkConnection" />
   </div>
 </template>
 
@@ -18,12 +27,15 @@ let connection = null
 export default {
   private: {
     status: 'Ожидание телефона',
-    pageTitle: 'Открой сайт на телефоне',
-    pageText: 'WristBrowser получает упрощённый текст веб-страниц через приложение на телефоне.',
+    pageTitle: 'Введи запрос для Google',
+    pageText: 'Результаты поиска и страницы будут показываться здесь как снимок сайта.',
+    query: '',
     transferId: '',
     expected: 0,
     chunks: [],
-    receivedCount: 0
+    receivedCount: 0,
+    imageData: '',
+    imageTitle: ''
   },
   onInit() {
     this.bindConnection()
@@ -42,6 +54,47 @@ export default {
       this.status = 'Ошибка запуска связи'
     }
   },
+  sendCommand(type, extra) {
+    try {
+      if (!connection) connection = interconnect.instance()
+      let data = { protocol: 1, type: type }
+      if (extra) {
+        Object.keys(extra).forEach((key) => { data[key] = extra[key] })
+      }
+      connection.send({
+        data: data,
+        success: () => {},
+        fail: () => { this.status = 'Не удалось отправить команду телефону' }
+      })
+    } catch (e) {
+      this.status = 'Ошибка отправки команды'
+    }
+  },
+  onQueryChange(event) {
+    this.query = event && event.value !== undefined ? event.value : this.query
+  },
+  search() {
+    const value = (this.query || '').trim()
+    if (!value) {
+      this.status = 'Сначала введи запрос'
+      return
+    }
+    this.imageData = ''
+    this.pageTitle = 'Поиск: ' + value
+    this.status = 'Ищу в Google…'
+    this.sendCommand('search', { query: value })
+  },
+  scrollUp() {
+    this.sendCommand('scroll', { delta: -320 })
+  },
+  scrollDown() {
+    this.sendCommand('scroll', { delta: 320 })
+  },
+  tapImage(event) {
+    const x = event && event.pageX !== undefined ? Math.round((event.pageX - 24) * 466 / 418) : 233
+    const y = event && event.pageY !== undefined ? Math.round((event.pageY - 145) * 466 / 250) : 233
+    this.sendCommand('tap', { x: Math.max(0, Math.min(465, x)), y: Math.max(0, Math.min(465, y)) })
+  },
   checkConnection() {
     try {
       if (!connection) connection = interconnect.instance()
@@ -56,6 +109,12 @@ export default {
       this.status = 'Ошибка проверки связи'
     }
   },
+  base64ToArrayBuffer(base64) {
+    const binary = atob(base64)
+    const bytes = new Uint8Array(binary.length)
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+    return bytes.buffer
+  },
   handleMessage(raw) {
     let msg
     try {
@@ -66,44 +125,81 @@ export default {
     }
     if (!msg || msg.protocol !== 1 || !msg.type || !msg.id) return
 
-    if (msg.type === 'page_start') {
+    if (msg.type === 'browser_image_start') {
       if (!Number.isInteger(msg.chunks) || msg.chunks < 1 || msg.chunks > 256) {
-        this.status = 'Некорректный размер страницы'
+        this.status = 'Некорректный снимок'
         return
       }
       this.transferId = msg.id
       this.expected = msg.chunks
       this.chunks = []
       this.receivedCount = 0
+      this.imageTitle = typeof msg.title === 'string' ? msg.title.slice(0, 120) : 'Веб-страница'
+      this.pageTitle = this.imageTitle
+      this.status = 'Получаю экран: 0/' + this.expected
+      return
+    }
+
+    if (msg.type === 'page_start') {
+      if (!Number.isInteger(msg.chunks) || msg.chunks < 1 || msg.chunks > 256) return
+      this.transferId = msg.id
+      this.expected = msg.chunks
+      this.chunks = []
+      this.receivedCount = 0
       this.pageTitle = typeof msg.title === 'string' ? msg.title.slice(0, 160) : 'Веб-страница'
       this.pageText = ''
-      this.status = 'Получаю страницу: 0/' + this.expected
+      this.imageData = ''
+      this.status = 'Получаю текст: 0/' + this.expected
       return
     }
 
     if (msg.id !== this.transferId) return
-    if (msg.type === 'page_chunk') {
-      if (!Number.isInteger(msg.index) || msg.index < 0 || msg.index >= this.expected || typeof msg.text !== 'string') {
-        this.status = 'Некорректная часть страницы'
+    if (msg.type === 'browser_image_chunk') {
+      if (!Number.isInteger(msg.index) || msg.index < 0 || msg.index >= this.expected || typeof msg.data !== 'string') return
+      if (this.chunks[msg.index] === undefined) this.receivedCount++
+      this.chunks[msg.index] = msg.data
+      this.status = 'Снимок: ' + this.receivedCount + '/' + this.expected
+      return
+    }
+    if (msg.type === 'browser_image_end') {
+      if (this.receivedCount !== this.expected) {
+        this.status = 'Снимок неполный: ' + this.receivedCount + '/' + this.expected
         return
       }
-      if (this.chunks[msg.index] === undefined) this.receivedCount++
-      this.chunks[msg.index] = msg.text
-      this.status = 'Получено: ' + this.receivedCount + '/' + this.expected
+      let encoded = ''
+      for (let i = 0; i < this.expected; i++) {
+        if (typeof this.chunks[i] !== 'string') return
+        encoded += this.chunks[i]
+      }
+      try {
+        const buffer = this.base64ToArrayBuffer(encoded)
+        file.writeArrayBuffer({
+          uri: 'internal://cache/wristbrowser-screen.jpg',
+          buffer: buffer,
+          success: () => {
+            this.imageData = 'internal://cache/wristbrowser-screen.jpg'
+            this.status = 'Страница загружена. Нажимай по ссылкам или прокручивай'
+          },
+          fail: (e, code) => { this.status = 'Ошибка сохранения снимка: ' + code }
+        })
+      } catch (e) {
+        this.status = 'Не удалось обработать изображение'
+      }
       return
     }
 
+    if (msg.type === 'page_chunk') {
+      if (!Number.isInteger(msg.index) || msg.index < 0 || msg.index >= this.expected || typeof msg.text !== 'string') return
+      if (this.chunks[msg.index] === undefined) this.receivedCount++
+      this.chunks[msg.index] = msg.text
+      this.status = 'Текст: ' + this.receivedCount + '/' + this.expected
+      return
+    }
     if (msg.type === 'page_end') {
-      if (this.receivedCount !== this.expected) {
-        this.status = 'Страница неполная: ' + this.receivedCount + '/' + this.expected
-        return
-      }
+      if (this.receivedCount !== this.expected) return
       let complete = ''
       for (let i = 0; i < this.expected; i++) {
-        if (typeof this.chunks[i] !== 'string') {
-          this.status = 'Не хватает части ' + (i + 1)
-          return
-        }
+        if (typeof this.chunks[i] !== 'string') return
         complete += this.chunks[i]
       }
       this.pageText = complete
@@ -111,7 +207,7 @@ export default {
         uri: 'internal://files/wristbrowser-page.txt',
         text: complete,
         encoding: 'UTF-8',
-        success: () => { this.status = 'Страница получена и сохранена' },
+        success: () => { this.status = 'Текстовая страница получена и сохранена' },
         fail: (e, code) => { this.status = 'Ошибка сохранения: ' + code }
       })
     }
@@ -124,13 +220,18 @@ export default {
   width: 466px;
   height: 466px;
   flex-direction: column;
-  padding: 24px;
+  padding: 18px 24px;
   background-color: #101820;
 }
-.brand { color: #8ed6c5; font-size: 24px; font-weight: bold; margin-bottom: 8px; }
-.status { color: #9aa7b2; font-size: 16px; margin-bottom: 10px; }
-.heading { color: #ffffff; font-size: 23px; font-weight: bold; margin-bottom: 8px; }
-.reader { width: 418px; height: 270px; }
-.body { color: #e2e8ed; font-size: 18px; line-height: 1.4; }
-.button { width: 260px; height: 48px; color: #101820; background-color: #8ed6c5; font-size: 18px; margin-top: 8px; }
+.brand { color: #8ed6c5; font-size: 22px; font-weight: bold; margin-bottom: 4px; }
+.status { color: #9aa7b2; font-size: 14px; margin-bottom: 5px; }
+.searchRow { width: 418px; height: 48px; flex-direction: row; margin-bottom: 5px; }
+.query { width: 290px; height: 46px; color: #ffffff; background-color: #263440; font-size: 17px; }
+.searchButton { width: 118px; height: 46px; color: #101820; background-color: #8ed6c5; font-size: 17px; margin-left: 8px; }
+.controls { width: 418px; height: 42px; flex-direction: row; justify-content: space-between; margin-bottom: 4px; }
+.smallButton { width: 128px; height: 40px; color: #101820; background-color: #8ed6c5; font-size: 16px; }
+.heading { color: #ffffff; font-size: 17px; font-weight: bold; margin-bottom: 4px; }
+.browserImage { width: 418px; height: 260px; object-fit: contain; }
+.reader { width: 418px; height: 250px; }
+.body { color: #e2e8ed; font-size: 17px; line-height: 1.4; }
 </style>
