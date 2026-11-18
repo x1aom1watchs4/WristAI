@@ -180,10 +180,17 @@ class MainActivity : ComponentActivity() {
                                     val delta = command.optInt("delta", 300).coerceIn(-1200, 1200)
                                     val view = browserView
                                     if (view != null && pageReady && !pageLoading) {
-                                        view.evaluateJavascript("window.scrollBy({top:$delta,behavior:'auto'})", null)
+                                        status = if (delta > 0) "Scrolling page down..." else "Scrolling page up..."
+                                        // Scroll the actual WebView first. This works even on pages
+                                        // whose content does not respond to window.scrollBy().
+                                        view.scrollBy(0, delta)
+                                        val script = "(function(){var x=Math.floor(window.innerWidth/2),y=Math.floor(window.innerHeight/2),e=document.elementFromPoint(x,y);while(e&&e!==document.body){var s=getComputedStyle(e);if((s.overflowY==='auto'||s.overflowY==='scroll')&&e.scrollHeight>e.clientHeight+2){e.scrollTop+=($delta);return 'nested';}e=e.parentElement;}window.scrollBy(0,($delta));if(document.scrollingElement)document.scrollingElement.scrollTop+=0;return 'document';})()"
+                                        view.evaluateJavascript(script, null)
                                         mainHandler.postDelayed({
                                             if (pageReady && !pageLoading) browserView?.let { captureAndSend(it) }
-                                        }, 35)
+                                        }, 90)
+                                    } else {
+                                        status = "Scroll ignored: page is not ready yet."
                                     }
                                 }
                                 "back" -> {
