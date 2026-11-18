@@ -46,7 +46,7 @@ class MainActivity : ComponentActivity() {
                 if (sendingImage) { capturePending = true; return }
                 sendingImage = true
                 status = "Preparing page content for watch..."
-                val script = "(function(){return JSON.stringify({title:document.title||location.hostname,url:location.href,text:(document.body&&document.body.innerText||'').slice(0,60000)});})()"
+                val script = "(function(){var links=Array.from(document.querySelectorAll('a[href]')).filter(function(a){return a.href&&a.href.indexOf('https://')===0;}).slice(0,40).map(function(a){return {title:((a.innerText||a.getAttribute('aria-label')||a.href).trim().replace(/\\s+/g,' ').slice(0,90)),url:a.href};}).filter(function(a){return a.title;});return JSON.stringify({title:document.title||location.hostname,url:location.href,text:(document.body&&document.body.innerText||'').slice(0,54000),links:links});})()"
                 view.evaluateJavascript(script) { result ->
                     try {
                         val encoded = org.json.JSONTokener(result ?: "\"\"").nextValue() as? String
@@ -55,7 +55,9 @@ class MainActivity : ComponentActivity() {
                         val page = WebPage(
                             pageData.optString("url", view.url ?: ""),
                             pageData.optString("title", view.title ?: "Web page"),
-                            pageData.optString("text", "")
+                            pageData.optString("text", "") +
+                                "\\n\\n__WRIST_LINKS__\\n" +
+                                (pageData.optJSONArray("links")?.toString() ?: "[]")
                         )
                         if (page.text.isBlank()) throw IllegalStateException("No readable page text")
                         bridge.send(page) { message ->
@@ -119,6 +121,20 @@ class MainActivity : ComponentActivity() {
                                     if (capturePending) {
                                         capturePending = false
                                         mainHandler.postDelayed({ browserView?.let { captureAndSend(it) } }, 180)
+                                    }
+                                }
+                                "open_link" -> {
+                                    val target = command.optString("url")
+                                    val parsed = Uri.parse(target)
+                                    val view = browserView
+                                    if (parsed.scheme == "https" && !parsed.host.isNullOrBlank() && view != null) {
+                                        address = target
+                                        sendAfterLoad = true
+                                        pageReady = false
+                                        view.loadUrl(target)
+                                        status = "Opening link..."
+                                    } else {
+                                        status = "Ignored unsupported link."
                                     }
                                 }
                                 "search" -> {
