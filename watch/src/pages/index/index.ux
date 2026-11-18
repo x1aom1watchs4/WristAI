@@ -24,6 +24,7 @@ import interconnect from '@system.interconnect'
 import file from '@system.file'
 
 let connection = null
+let connectionOpened = false
 export default {
   private: {
     status: 'Waiting for phone',
@@ -43,9 +44,9 @@ export default {
   bindConnection() {
     try {
       connection = interconnect.instance()
-      connection.onopen = () => { this.status = 'Phone connected' }
-      connection.onclose = () => { this.status = 'Connect прервана' }
-      connection.onerror = (e) => { this.status = 'Connection error: ' + (e && e.code !== undefined ? e.code : 'unknown') }
+      connection.onopen = () => { connectionOpened = true; this.status = 'Phone connected' }
+      connection.onclose = () => { connectionOpened = false; this.status = 'Connection closed' }
+      connection.onerror = (e) => { connectionOpened = false; this.status = 'Connection error: ' + (e && e.code !== undefined ? e.code : 'unknown') }
       connection.onmessage = (event) => {
         const raw = event && event.data !== undefined ? event.data : event
         this.handleMessage(raw)
@@ -106,29 +107,14 @@ export default {
   },
   checkConnection() {
     try {
-      if (!connection) connection = interconnect.instance()
-      this.status = 'Checking connection...'
-      connection.diagnosis({
-        timeout: 10000,
-        success: (result) => {
-          const code = result && result.status !== undefined ? result.status : 'unknown'
-          if (code === 0) {
-            this.status = 'Phone connected'
-          } else if (code === 204) {
-            this.status = 'Connect timeout (204)'
-          } else if (code === 1001) {
-            this.status = 'Phone app not installed (1001)'
-          } else {
-            this.status = 'Connection status: ' + code
-          }
-        },
-        fail: (data, code) => {
-          const detail = typeof data === 'string' ? data : (data && data.data ? data.data : 'no details')
-          this.status = 'Check failed (' + (code !== undefined ? code : 'unknown') + '): ' + String(detail).slice(0, 70)
-        }
-      })
+      if (!connection) {
+        connection = interconnect.instance()
+        this.bindConnection()
+        return
+      }
+      this.status = connectionOpened ? 'Phone connected' : 'Waiting for phone connection...'
     } catch (e) {
-      this.status = 'Check exception: ' + String(e && e.message ? e.message : e).slice(0, 70)
+      this.status = 'Connection check error'
     }
   },
   base64ToArrayBuffer(base64) {
