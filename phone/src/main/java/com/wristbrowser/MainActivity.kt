@@ -205,15 +205,12 @@ class MainActivity : ComponentActivity() {
                             val command = JSONObject(raw)
                             when (command.optString("type")) {
                                 "browser_image_ack" -> {
-                                    sendingImage = false
-                                    status = if (command.optBoolean("ok", false)) {
-                                        "Watch confirmed: preview received and displayed."
-                                    } else {
-                                        "Watch could not display image: " + command.optString("error", "unknown error")
-                                    }
-                                    if (capturePending) {
-                                        capturePending = false
-                                        mainHandler.postDelayed({ browserView?.let { captureAndSend(it) } }, 180)
+                                    if (!sendingImage) {
+                                        status = if (command.optBoolean("ok", false)) {
+                                            "Watch saved the page image."
+                                        } else {
+                                            "Watch could not save image: " + command.optString("error", "unknown error")
+                                        }
                                     }
                                 }
                                 "open_link" -> {
