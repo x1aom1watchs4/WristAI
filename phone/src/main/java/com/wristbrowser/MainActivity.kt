@@ -40,9 +40,10 @@ class MainActivity : ComponentActivity() {
             var pageProgress by remember { mutableIntStateOf(0) }
             var sendAfterLoad by remember { mutableStateOf(false) }
             var sendingImage by remember { mutableStateOf(false) }
+            var capturePending by remember { mutableStateOf(false) }
 
             fun captureAndSend(view: WebView) {
-                if (sendingImage) return
+                if (sendingImage) { capturePending = true; return }
                 sendingImage = true
                 status = "Preparing image for watch..."
                 mainHandler.postDelayed({
@@ -69,13 +70,25 @@ class MainActivity : ComponentActivity() {
                             output.toByteArray()
                         ) { message ->
                             status = message
-                            if (message.startsWith("Transfer complete") ||
-                                message.contains("error", ignoreCase = true) ||
+                            if (message.contains("error", ignoreCase = true) ||
                                 message.contains("Could not", ignoreCase = true) ||
                                 message.startsWith("Watch not connected")) {
                                 sendingImage = false
+                                if (capturePending) {
+                                    capturePending = false
+                                    mainHandler.postDelayed({ browserView?.let { captureAndSend(it) } }, 180)
+                                }
                             }
                         }
+                        mainHandler.postDelayed({
+                            if (sendingImage) {
+                                sendingImage = false
+                                if (capturePending) {
+                                    capturePending = false
+                                    browserView?.let { captureAndSend(it) }
+                                }
+                            }
+                        }, 7000)
                     } catch (e: Exception) {
                         sendingImage = false
                         status = "Could not capture preview: ${e.message ?: "error"}"
@@ -119,6 +132,10 @@ class MainActivity : ComponentActivity() {
                                     } else {
                                         "Watch could not display image: " + command.optString("error", "unknown error")
                                     }
+                                    if (capturePending) {
+                                        capturePending = false
+                                        mainHandler.postDelayed({ browserView?.let { captureAndSend(it) } }, 180)
+                                    }
                                 }
                                 "search" -> {
                                     val query = command.optString("query").take(300)
@@ -133,24 +150,40 @@ class MainActivity : ComponentActivity() {
                                     val view = browserView
                                     if (view != null && pageReady && !pageLoading) {
                                         sendAfterLoad = true
-                                        val script = "(function(){var x=($x/418)*window.innerWidth;var y=($y/260)*window.innerHeight;var e=document.elementFromPoint(x,y);if(!e)return false;var a=e.closest('a,button,input,select,textarea,[role=button],[onclick]');(a||e).click();return true;})()"
-                                        view.evaluateJavascript(script, null)
-                                        mainHandler.postDelayed({
-                                            if (sendAfterLoad && pageReady && !pageLoading) {
-                                                sendAfterLoad = false
-                                                browserView?.let { captureAndSend(it) }
+                                        val script = "(function(){var x=($x/418)*window.innerWidth;var y=($y/260)*window.innerHeight;var e=document.elementFromPoint(x,y);if(!e)return '';var a=e.closest('a[href]');if(a&&a.href&&a.href.indexOf('https:')===0)return a.href;var b=e.closest('button,input,select,textarea,[role=button],[onclick]');(b||e).click();return '';})()"
+                                        view.evaluateJavascript(script) { result ->
+                                            val href = try { org.json.JSONTokener(result ?: "\"\\\"\\\"").nextValue() as? String } catch (_: Exception) { null }
+                                            if (!href.isNullOrBlank() && href.startsWith("https://")) {
+                                                view.loadUrl(href)
+                                            } else {
+                                                mainHandler.postDelayed({
+                                                    if (sendAfterLoad && pageReady && !pageLoading) {
+                                                        sendAfterLoad = false
+                                                        captureAndSend(view)
+                                                    }
+                                                }, 900)
                                             }
-                                        }, 1000)
+                                        }
+                                        mainHandler.postDelayed({
+                                            if (sendAfterLoad && pageLoading) {
+                                                view.stopLoading()
+                                                pageLoading = false
+                                                pageReady = true
+                                                sendAfterLoad = false
+                                                status = "Page load timed out; showing current page."
+                                                captureAndSend(view)
+                                            }
+                                        }, 9000)
                                     }
                                 }
                                 "scroll" -> {
                                     val delta = command.optInt("delta", 300).coerceIn(-1200, 1200)
                                     val view = browserView
                                     if (view != null && pageReady && !pageLoading) {
-                                        view.evaluateJavascript("window.scrollBy(0,$delta)", null)
+                                        view.evaluateJavascript("window.scrollBy({top:$delta,behavior:'auto'})", null)
                                         mainHandler.postDelayed({
                                             if (pageReady && !pageLoading) browserView?.let { captureAndSend(it) }
-                                        }, 250)
+                                        }, 110)
                                     }
                                 }
                                 "back" -> {
