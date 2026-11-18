@@ -94,10 +94,10 @@ export default {
     this.sendCommand('search', { query: value })
   },
   scrollUp() {
-    this.sendCommand('scroll', { delta: -320 })
+    this.sendCommand('scroll', { delta: -560 })
   },
   scrollDown() {
-    this.sendCommand('scroll', { delta: 320 })
+    this.sendCommand('scroll', { delta: 560 })
   },
   onImageComplete(event) {
     const width = event && event.width ? event.width : 0
@@ -139,7 +139,7 @@ export default {
     this.touchStartY = -1
 
     if (Math.abs(dy) >= 24 && Math.abs(dy) > Math.abs(dx)) {
-      const delta = Math.round(-dy * 260 / 205)
+      const delta = Math.round(-dy * 520 / 205)
       this.status = delta > 0 ? 'Scrolling down...' : 'Scrolling up...'
       this.sendCommand('scroll', { delta: delta })
       return
