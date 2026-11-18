@@ -12,7 +12,7 @@
       <input type="button" class="smallButton" value="Связь" @click="checkConnection" />
     </div>
     <text class="heading">{{pageTitle}}</text>
-    <image if="{{imageData}}" class="browserImage" src="{{imageData}}" @click="tapImage" />
+    <image if="{{imageData}}" class="browserImage" src="{{imageData}}" @click="tapImage" @complete="onImageComplete" @error="onImageError" />
     <scroll if="{{!imageData}}" class="reader">
       <text class="body">{{pageText}}</text>
     </scroll>
@@ -90,6 +90,13 @@ export default {
   scrollDown() {
     this.sendCommand('scroll', { delta: 320 })
   },
+  onImageComplete(event) {
+    this.status = 'Картинка отображается. Можно нажимать по ссылкам и прокручивать.'
+  },
+  onImageError() {
+    this.status = 'Файл получен, но часы не смогли декодировать JPEG.'
+    this.sendCommand('browser_image_ack', { id: this.transferId, ok: false, error: 'image decode failed' })
+  },
   tapImage(event) {
     const x = event && event.pageX !== undefined ? Math.round((event.pageX - 24) * 466 / 418) : 233
     const y = event && event.pageY !== undefined ? Math.round((event.pageY - 145) * 466 / 250) : 233
@@ -113,7 +120,7 @@ export default {
     const binary = atob(base64)
     const bytes = new Uint8Array(binary.length)
     for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
-    return bytes.buffer
+    return bytes
   },
   handleMessage(raw) {
     let msg
@@ -174,7 +181,7 @@ export default {
       try {
         const buffer = this.base64ToArrayBuffer(encoded)
         file.writeArrayBuffer({
-          uri: 'internal://cache/wristbrowser-screen.jpg',
+          uri: 'internal://files/wristbrowser-screen.jpg',
           buffer: buffer,
           success: () => {
             this.imageData = 'internal://cache/wristbrowser-screen.jpg'
