@@ -45,55 +45,39 @@ class MainActivity : ComponentActivity() {
             fun captureAndSend(view: WebView) {
                 if (sendingImage) { capturePending = true; return }
                 sendingImage = true
-                status = "Preparing image for watch..."
-                mainHandler.postDelayed({
+                status = "Preparing page content for watch..."
+                val script = "(function(){return JSON.stringify({title:document.title||location.hostname,url:location.href,text:(document.body&&document.body.innerText||'').slice(0,60000)});})()"
+                view.evaluateJavascript(script) { result ->
                     try {
-                        if (view.width <= 0 || view.height <= 0) {
-                            sendingImage = false
-                            status = "Preview is not ready yet. Open the page again."
-                            return@postDelayed
-                        }
-                        val width = 418
-                        val height = 260
-                        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.RGB_565)
-                        val canvas = Canvas(bitmap)
-                        canvas.scale(
-                            width.toFloat() / view.width.coerceAtLeast(1),
-                            height.toFloat() / view.height.coerceAtLeast(1)
+                        val encoded = org.json.JSONTokener(result ?: "\"\"").nextValue() as? String
+                            ?: throw IllegalStateException("Empty page response")
+                        val pageData = JSONObject(encoded)
+                        val page = WebPage(
+                            pageData.optString("url", view.url ?: ""),
+                            pageData.optString("title", view.title ?: "Web page"),
+                            pageData.optString("text", "")
                         )
-                        view.draw(canvas)
-                        val output = ByteArrayOutputStream()
-                        bitmap.compress(Bitmap.CompressFormat.JPEG, 55, output)
-                        bitmap.recycle()
-                        bridge.sendBrowserImage(
-                            view.title?.ifBlank { view.url ?: "Web page" } ?: "Web page",
-                            output.toByteArray()
-                        ) { message ->
+                        if (page.text.isBlank()) throw IllegalStateException("No readable page text")
+                        bridge.send(page) { message ->
                             status = message
                             if (message.contains("error", ignoreCase = true) ||
                                 message.contains("Could not", ignoreCase = true) ||
-                                message.startsWith("Watch not connected")) {
+                                message.contains("not connected", ignoreCase = true)) {
                                 sendingImage = false
-                                if (capturePending) {
-                                    capturePending = false
-                                    mainHandler.postDelayed({ browserView?.let { captureAndSend(it) } }, 180)
-                                }
                             }
                         }
                         mainHandler.postDelayed({
-                            if (sendingImage) {
-                                sendingImage = false
-                                if (capturePending) {
-                                    capturePending = false
-                                    browserView?.let { captureAndSend(it) }
-                                }
+                            sendingImage = false
+                            if (capturePending) {
+                                capturePending = false
+                                browserView?.let { captureAndSend(it) }
                             }
-                        }, 7000)
-                    } catch (e: Exception) {
+                        }, 9000)
+                    } catch (error: Exception) {
                         sendingImage = false
-                        status = "Could not capture preview: ${e.message ?: "error"}"
+                        status = "Could not prepare page: ${error.message ?: "unknown error"}"
                     }
-                }, 35)
+                }
             }
 
             fun openBrowserUrl(raw: String, sendWhenReady: Boolean = false) {
@@ -238,7 +222,7 @@ class MainActivity : ComponentActivity() {
                     ) {
                         Text("WristBrowser", style = MaterialTheme.typography.headlineMedium)
                         Text(
-                            "Open a website here and preview exactly what is sent to your Xiaomi Watch S4.",
+                            "Open a website on the phone and send its readable page content to Xiaomi Watch S4 over the existing WristBook connection.",
                             style = MaterialTheme.typography.bodyMedium
                         )
 
@@ -265,14 +249,14 @@ class MainActivity : ComponentActivity() {
                                 onClick = { browserView?.let { captureAndSend(it) } },
                                 enabled = pageReady && !pageLoading && browserView != null && !sendingImage,
                                 modifier = Modifier.weight(1f)
-                            ) { Text(if (sendingImage) "Sending..." else "Send to Watch") }
+                            ) { Text(if (sendingImage) "Sending..." else "Send page to Watch") }
                         }
 
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Text("WATCH PREVIEW", style = MaterialTheme.typography.labelLarge)
+                            Text("PAGE CONTENT TRANSFER", style = MaterialTheme.typography.labelLarge)
                             Text("418 × 260", style = MaterialTheme.typography.labelSmall)
                         }
 
@@ -367,7 +351,7 @@ class MainActivity : ComponentActivity() {
 
                         Text(status, style = MaterialTheme.typography.bodyMedium)
                         Text(
-                            "The preview uses the same 418 × 260 image size as the watch. Touches and scrolling on the watch control this page.",
+                            "The watch receives page text over the WristBook-compatible Xiaomi connection. No page screenshots are sent.",
                             style = MaterialTheme.typography.bodySmall
                         )
                     }
