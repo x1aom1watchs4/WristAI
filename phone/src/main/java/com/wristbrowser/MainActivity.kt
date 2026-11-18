@@ -184,7 +184,7 @@ class MainActivity : ComponentActivity() {
                                         // Scroll the actual WebView first. This works even on pages
                                         // whose content does not respond to window.scrollBy().
                                         view.scrollBy(0, delta)
-                                        val script = "(function(){var x=Math.floor(window.innerWidth/2),y=Math.floor(window.innerHeight/2),e=document.elementFromPoint(x,y);while(e&&e!==document.body){var s=getComputedStyle(e);if((s.overflowY==='auto'||s.overflowY==='scroll')&&e.scrollHeight>e.clientHeight+2){e.scrollTop+=($delta);return 'nested';}e=e.parentElement;}window.scrollBy(0,($delta));if(document.scrollingElement)document.scrollingElement.scrollTop+=0;return 'document';})()"
+                                        val script = "(function(){var x=Math.floor(window.innerWidth/2),y=Math.floor(window.innerHeight/2),e=document.elementFromPoint(x,y);while(e&&e!==document.body){var s=getComputedStyle(e);if((s.overflowY==='auto'||s.overflowY==='scroll')&&e.scrollHeight>e.clientHeight+2){e.scrollTop+=($delta);return 'nested';}e=e.parentElement;}return 'document';})()"
                                         view.evaluateJavascript(script, null)
                                         mainHandler.postDelayed({
                                             if (pageReady && !pageLoading) browserView?.let { captureAndSend(it) }
