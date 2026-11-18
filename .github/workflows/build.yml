@@ -29,12 +29,62 @@ jobs:
             https://raw.githubusercontent.com/open-vela/packages_apps/dev/wearable/interconnect_image_demo/android_program/libs/xms-wearable-lib_1.4_release.aar \
             --output phone/libs/xms-wearable-lib_1.4_release.aar
           test -s phone/libs/xms-wearable-lib_1.4_release.aar
+      - name: Configure shared Android and Vela signing certificate
+        id: android-signing
+        env:
+          VELA_PRIVATE_KEY: ${{ secrets.VELA_PRIVATE_KEY }}
+          VELA_CERTIFICATE: ${{ secrets.VELA_CERTIFICATE }}
+          ANDROID_KEYSTORE_PASSWORD: wristbrowser-${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          set -euo pipefail
+          if [ -z "$VELA_PRIVATE_KEY" ] || [ -z "$VELA_CERTIFICATE" ]; then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "Shared release signing secrets are missing; skipping Android release APK."
+            exit 0
+          fi
+          mkdir -p phone/sign
+          printf '%s\n' "$VELA_PRIVATE_KEY" > phone/sign/private.pem
+          printf '%s\n' "$VELA_CERTIFICATE" > phone/sign/certificate.pem
+          openssl pkey -in phone/sign/private.pem -check -noout
+          openssl x509 -in phone/sign/certificate.pem -noout -subject -dates
+          KEY_HASH="$(openssl pkey -in phone/sign/private.pem -pubout -outform DER | sha256sum | cut -d' ' -f1)"
+          CERT_HASH="$(openssl x509 -in phone/sign/certificate.pem -pubkey -noout | openssl pkey -pubin -outform DER | sha256sum | cut -d' ' -f1)"
+          test "$KEY_HASH" = "$CERT_HASH"
+          openssl pkcs12 -export \
+            -inkey phone/sign/private.pem \
+            -in phone/sign/certificate.pem \
+            -name wristbrowser \
+            -out phone/signing.p12 \
+            -passout env:ANDROID_KEYSTORE_PASSWORD
+          echo "ANDROID_KEYSTORE_PATH=$GITHUB_WORKSPACE/phone/signing.p12" >> "$GITHUB_ENV"
+          echo "ANDROID_KEYSTORE_PASSWORD=$ANDROID_KEYSTORE_PASSWORD" >> "$GITHUB_ENV"
+          echo "ready=true" >> "$GITHUB_OUTPUT"
       - name: Build debug APK
         run: gradle :phone:assembleDebug --stacktrace
       - uses: actions/upload-artifact@v4
         with:
-          name: WristBrowser-Android-APK
+          name: WristBrowser-Android-Debug-APK
           path: phone/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+      - name: Build release APK with the exact Vela RPK certificate
+        if: steps.android-signing.outputs.ready == 'true'
+        run: gradle :phone:assembleRelease --stacktrace
+      - name: Verify Android APK certificate matches Vela certificate
+        if: steps.android-signing.outputs.ready == 'true'
+        run: |
+          set -euo pipefail
+          APK="$(find phone/build/outputs/apk/release -type f -name '*.apk' -print -quit)"
+          test -n "$APK"
+          EXPECTED="$(openssl x509 -in phone/sign/certificate.pem -noout -fingerprint -sha256 | cut -d= -f2 | tr -d ':' | tr '[:upper:]' '[:lower:]')"
+          ACTUAL="$(keytool -printcert -jarfile "$APK" | awk -F': ' '/SHA256:/ {print $2}' | tr -d ':' | tr '[:upper:]' '[:lower:]')"
+          test -n "$ACTUAL"
+          test "$EXPECTED" = "$ACTUAL"
+          echo "Verified: Android APK and Vela RPK use the same SHA-256 certificate."
+      - uses: actions/upload-artifact@v4
+        if: steps.android-signing.outputs.ready == 'true'
+        with:
+          name: WristBrowser-Android-Release-APK
+          path: phone/build/outputs/apk/release/*.apk
           if-no-files-found: error
 
   vela:
