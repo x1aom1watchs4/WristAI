@@ -115,17 +115,17 @@ class MainActivity : ComponentActivity() {
                 if (sendingImage) { capturePending = true; return }
                 sendingImage = true
                 status = "Preparing text and images for watch..."
-                val script = "(function(){var links=Array.from(document.querySelectorAll('a[href]')).filter(function(a){return a.href&&a.href.indexOf('https://')===0;}).slice(0,40).map(function(a){return {title:((a.innerText||a.getAttribute('aria-label')||a.href).trim().replace(/\\\\s+/g,' ').slice(0,90)),url:a.href};}).filter(function(a){return a.title;});var images=Array.from(document.images).filter(function(i){return i.complete&&i.naturalWidth>=100&&i.naturalHeight>=70;}).slice(0,3).map(function(i){return {url:i.currentSrc||i.src,title:(i.alt||i.title||'Изображение').trim().slice(0,80)};}).filter(function(i){return i.url&&i.url.indexOf('https://')===0;});return JSON.stringify({title:document.title||location.hostname,url:location.href,text:(document.body&&document.body.innerText||'').slice(0,54000),links:links,images:images});})()"
+                val script = "(function(){var links=Array.from(document.querySelectorAll('a[href]')).filter(function(a){return a.href&&a.href.indexOf('https://')===0;}).slice(0,40).map(function(a){return {title:((a.innerText||a.getAttribute('aria-label')||a.href).trim().replace(/\\s+/g,' ').slice(0,90)),url:a.href};}).filter(function(a){return a.title;});var images=Array.from(document.images).filter(function(i){return i.complete&&i.naturalWidth>=100&&i.naturalHeight>=70;}).slice(0,3).map(function(i){return {url:i.currentSrc||i.src,title:(i.alt||i.title||'Изображение').trim().slice(0,80)};}).filter(function(i){return i.url&&i.url.indexOf('https://')===0;});return JSON.stringify({title:document.title||location.hostname,url:location.href,text:(document.body&&document.body.innerText||'').slice(0,54000),links:links,images:images});})()"
                 view.evaluateJavascript(script) { result ->
                     try {
-                        val encoded = org.json.JSONTokener(result ?: "\\"\\"").nextValue() as? String
+                        val encoded = org.json.JSONTokener(result ?: "\"\"").nextValue() as? String
                             ?: throw IllegalStateException("Empty page response")
                         val pageData = JSONObject(encoded)
                         val normalizedText = Normalizer.normalize(pageData.optString("text", ""), Normalizer.Form.NFC)
                         val page = WebPage(
                             pageData.optString("url", view.url ?: ""),
                             pageData.optString("title", view.title ?: "Web page"),
-                            normalizedText + "\\n\\n__WRIST_LINKS__\\n" +
+                            normalizedText + "\n\n__WRIST_LINKS__\n" +
                                 (pageData.optJSONArray("links")?.toString() ?: "[]")
                         )
                         if (page.text.isBlank()) throw IllegalStateException("No readable page text")
@@ -364,7 +364,7 @@ class MainActivity : ComponentActivity() {
                                 val testPage = WebPage(
                                     "https://example.com/unicode-test",
                                     "Проверка Unicode",
-                                    "Кириллица: Привет, мир! Ёжик, ЖЖ, Яя. Числа: 12345. Знаки: № ₽ © → • — …\\n" +
+                                    "Кириллица: Привет, мир! Ёжик, ЖЖ, Яя. Числа: 12345. Знаки: № ₽ © → • — …\n" +
                                         "Latin: café, naïve, Grüße. Emoji: 😀 🚀 🌍"
                                 )
                                 bridge.send(testPage, emptyList()) { message ->
