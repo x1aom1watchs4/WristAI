@@ -30,11 +30,11 @@ class WearableBridge(context: Context) {
         }
     }
 
-    fun send(page: WebPage, status: (String) -> Unit) {
+    fun send(page: WebPage, images: List<PageImage> = emptyList(), status: (String) -> Unit) {
         val connected = node
         if (connected != null) {
             status("Watch connected: ${connected.name}. Sending page...")
-            transferPage(connected, page, status)
+            transferPage(connected, page, images, status)
             return
         }
         status("Finding watch and setting up connection...")
@@ -42,41 +42,51 @@ class WearableBridge(context: Context) {
             registerCommandListener(found)
             authorizeAndOpen(found, status) {
                 status("Sending page...")
-                transferPage(found, page, status)
+                transferPage(found, page, images, status)
             }
         }
     }
 
-    fun sendBrowserImage(title: String, jpeg: ByteArray, status: (String) -> Unit) {
-        val target = node
-        if (target == null) {
-            status("Watch not connected. Open WristBrowser and check the connection.")
+    private fun transferImages(nodeId: String, images: List<PageImage>, imageIndex: Int, status: (String) -> Unit) {
+        if (imageIndex >= images.size) {
+            status("All page data and images sent. Images: ${images.size}.")
             return
         }
-        val encoded = Base64.encodeToString(jpeg, Base64.NO_WRAP)
+        val image = images[imageIndex]
+        val encoded = Base64.encodeToString(image.jpeg, Base64.NO_WRAP)
         val chunks = encoded.chunked(2400)
-        val id = UUID.randomUUID().toString()
+        val transferId = UUID.randomUUID().toString()
         val start = JSONObject().put("protocol", 1).put("type", "browser_image_start")
-            .put("id", id).put("title", title.take(120)).put("chunks", chunks.size).toString()
-        status("Sending page image to watch...")
-        sendPayload(target.id, start, {
-            sendImagePart(target.id, id, chunks, 0, status)
+            .put("id", transferId).put("title", image.title.take(120))
+            .put("chunks", chunks.size).toString()
+        status("Sending image ${imageIndex + 1}/${images.size}...")
+        sendPayload(nodeId, start, {
+            sendImagePart(nodeId, transferId, chunks, 0, imageIndex, images, status)
         }, { status("Could not start image transfer: $it") })
     }
 
-    private fun sendImagePart(id: String, transferId: String, chunks: List<String>, index: Int, status: (String) -> Unit) {
+    private fun sendImagePart(
+        nodeId: String,
+        transferId: String,
+        chunks: List<String>,
+        index: Int,
+        imageIndex: Int,
+        images: List<PageImage>,
+        status: (String) -> Unit
+    ) {
         if (index >= chunks.size) {
             val end = JSONObject().put("protocol", 1).put("type", "browser_image_end")
                 .put("id", transferId).toString()
-            sendPayload(id, end, { status("Transfer complete. Waiting for watch confirmation...") },
-                { status("Image transfer error: $it") })
+            sendPayload(nodeId, end, {
+                transferImages(nodeId, images, imageIndex + 1, status)
+            }, { status("Image transfer error: $it") })
             return
         }
         val payload = JSONObject().put("protocol", 1).put("type", "browser_image_chunk")
             .put("id", transferId).put("index", index).put("data", chunks[index]).toString()
-        sendPayload(id, payload, {
-            status("Image: ${index + 1}/${chunks.size}")
-            sendImagePart(id, transferId, chunks, index + 1, status)
+        sendPayload(nodeId, payload, {
+            status("Image ${imageIndex + 1}/${images.size}: ${index + 1}/${chunks.size}")
+            sendImagePart(nodeId, transferId, chunks, index + 1, imageIndex, images, status)
         }, { status("Image chunk error ${index + 1}: $it") })
     }
 
@@ -182,22 +192,29 @@ class WearableBridge(context: Context) {
         }
     }
 
-    private fun transferPage(target: Node, page: WebPage, status: (String) -> Unit) {
+    private fun transferPage(target: Node, page: WebPage, images: List<PageImage>, status: (String) -> Unit) {
         val transferId = UUID.randomUUID().toString()
         val chunks = splitUtf16Safely(page.text, 900)
         val start = JSONObject().put("protocol", 1).put("type", "page_start").put("id", transferId)
             .put("url", page.url).put("title", page.title).put("chunks", chunks.size).toString()
         status("Chunks prepared: ${chunks.size}")
         sendPayload(target.id, start,
-            { sendPart(target.id, transferId, chunks, 0, status) },
+            { sendPart(target.id, transferId, chunks, 0, images, status) },
             { error -> status("Could not start transfer: $error") }
         )
     }
 
-    private fun sendPart(id: String, transferId: String, chunks: List<String>, index: Int, status: (String) -> Unit) {
+    private fun sendPart(
+        id: String,
+        transferId: String,
+        chunks: List<String>,
+        index: Int,
+        images: List<PageImage>,
+        status: (String) -> Unit
+    ) {
         if (index >= chunks.size) {
             val end = JSONObject().put("protocol", 1).put("type", "page_end").put("id", transferId).toString()
-            sendPayload(id, end, { status("Data sent. Waiting for watch processing.") },
+            sendPayload(id, end, { transferImages(id, images, 0, status) },
                 { status("Transfer completion error: $it") })
             return
         }
@@ -205,7 +222,7 @@ class WearableBridge(context: Context) {
             .put("id", transferId).put("index", index).put("text", chunks[index]).toString()
         sendPayload(id, payload, {
             status("Sending: ${index + 1}/${chunks.size}")
-            sendPart(id, transferId, chunks, index + 1, status)
+            sendPart(id, transferId, chunks, index + 1, images, status)
         }, { status("Chunk error ${index + 1}: $it") })
     }
 
