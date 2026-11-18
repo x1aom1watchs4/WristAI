@@ -93,7 +93,7 @@ class MainActivity : ComponentActivity() {
                         sendingImage = false
                         status = "Could not capture preview: ${e.message ?: "error"}"
                     }
-                }, 120)
+                }, 35)
             }
 
             fun openBrowserUrl(raw: String, sendWhenReady: Boolean = false) {
@@ -183,7 +183,7 @@ class MainActivity : ComponentActivity() {
                                         view.evaluateJavascript("window.scrollBy({top:$delta,behavior:'auto'})", null)
                                         mainHandler.postDelayed({
                                             if (pageReady && !pageLoading) browserView?.let { captureAndSend(it) }
-                                        }, 110)
+                                        }, 35)
                                     }
                                 }
                                 "back" -> {
@@ -321,6 +321,26 @@ class MainActivity : ComponentActivity() {
                                                 }
                                             }
                                             setBackgroundColor(android.graphics.Color.WHITE)
+                                            // Let the WebView receive swipe gestures instead of the
+                                            // surrounding Compose screen stealing them for its scroll.
+                                            setOnTouchListener { web, event ->
+                                                when (event.actionMasked) {
+                                                    android.view.MotionEvent.ACTION_DOWN,
+                                                    android.view.MotionEvent.ACTION_MOVE ->
+                                                        web.parent?.requestDisallowInterceptTouchEvent(true)
+                                                    android.view.MotionEvent.ACTION_UP,
+                                                    android.view.MotionEvent.ACTION_CANCEL -> {
+                                                        web.parent?.requestDisallowInterceptTouchEvent(false)
+                                                        if (pageReady && !pageLoading) {
+                                                            mainHandler.postDelayed({
+                                                                if (pageReady && !pageLoading) {
+                                                                    browserView?.let { captureAndSend(it) }
+                                                                }
+                                                            }, 60)
+                                                        }
+                                                }
+                                                false
+                                            }
                                             browserView = this
                                         }
                                     },
