@@ -47,7 +47,8 @@ export default {
       connection.onclose = () => { this.status = 'Связь прервана' }
       connection.onerror = (e) => { this.status = 'Ошибка связи: ' + (e && e.code !== undefined ? e.code : 'неизвестно') }
       connection.onmessage = (event) => {
-        this.handleMessage(event && event.data !== undefined ? event.data : '')
+        const raw = event && event.data !== undefined ? event.data : event
+        this.handleMessage(raw)
       }
       this.checkConnection()
     } catch (e) {
@@ -124,14 +125,18 @@ export default {
     return bytes
   },
   handleMessage(raw) {
+    this.status = 'MESSAGE RECEIVED'
     let msg
     try {
       msg = typeof raw === 'string' ? JSON.parse(raw) : raw
     } catch (e) {
-      this.status = 'Повреждённое сообщение'
+      this.status = 'BAD JSON'
       return
     }
-    if (!msg || msg.protocol !== 1 || !msg.type || !msg.id) return
+    if (!msg || msg.protocol !== 1 || !msg.type || !msg.id) {
+      this.status = 'BAD HEADER'
+      return
+    }
 
     if (msg.type === 'browser_image_start') {
       if (!Number.isInteger(msg.chunks) || msg.chunks < 1 || msg.chunks > 256) {
@@ -144,7 +149,7 @@ export default {
       this.receivedCount = 0
       this.imageTitle = typeof msg.title === 'string' ? msg.title.slice(0, 120) : 'Веб-страница'
       this.pageTitle = this.imageTitle
-      this.status = 'Получаю экран: 0/' + this.expected
+      this.status = 'IMAGE START 0/' + this.expected
       return
     }
 
@@ -166,7 +171,7 @@ export default {
       if (!Number.isInteger(msg.index) || msg.index < 0 || msg.index >= this.expected || typeof msg.data !== 'string') return
       if (this.chunks[msg.index] === undefined) this.receivedCount++
       this.chunks[msg.index] = msg.data
-      this.status = 'Снимок: ' + this.receivedCount + '/' + this.expected
+      this.status = 'IMAGE CHUNK ' + this.receivedCount + '/' + this.expected
       return
     }
     if (msg.type === 'browser_image_end') {
