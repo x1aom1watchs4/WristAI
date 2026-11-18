@@ -9,7 +9,7 @@
     <div class="controls">
       <input type="button" class="smallButton" value="UP" @click="scrollUp" />
       <input type="button" class="smallButton" value="DOWN" @click="scrollDown" />
-      <input type="button" class="smallButton" value="LINK" @click="checkConnection" />
+      <input type="button" class="smallButton" value="CONNECT" @click="checkConnection" />
     </div>
     <text class="heading">{{pageTitle}}</text>
     <image if="{{imageData}}" class="browserImage" src="{{imageData}}" @click="tapImage" @complete="onImageComplete" @error="onImageError" />
