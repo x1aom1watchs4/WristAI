@@ -115,7 +115,7 @@ class MainActivity : ComponentActivity() {
                 if (sendingImage) { capturePending = true; return }
                 sendingImage = true
                 status = "Preparing text and images for watch..."
-                val script = "(function(){var links=Array.from(document.querySelectorAll('a[href]')).filter(function(a){return a.href&&a.href.indexOf('https://')===0;}).slice(0,40).map(function(a){return {title:((a.innerText||a.getAttribute('aria-label')||a.href).trim().replace(/\\s+/g,' ').slice(0,90)),url:a.href};}).filter(function(a){return a.title;});var images=Array.from(document.images).filter(function(i){return i.complete&&i.naturalWidth>=100&&i.naturalHeight>=70;}).slice(0,3).map(function(i){return {url:i.currentSrc||i.src,title:(i.alt||i.title||'Изображение').trim().slice(0,80)};}).filter(function(i){return i.url&&i.url.indexOf('https://')===0;});return JSON.stringify({title:document.title||location.hostname,url:location.href,text:(document.body&&document.body.innerText||'').slice(0,54000),links:links,images:images});})()"
+                val script = "(function(){var links=Array.from(document.querySelectorAll('a[href]')).filter(function(a){return a.href&&a.href.indexOf('https://')===0;}).slice(0,40).map(function(a){return {title:((a.innerText||a.getAttribute('aria-label')||a.href).trim().replace(/\\s+/g,' ').slice(0,90)),url:a.href};}).filter(function(a){return a.title;});var seen={};var images=Array.from(document.querySelectorAll('img')).map(function(i){var u=i.currentSrc||i.src||i.getAttribute('data-src')||i.getAttribute('data-original')||i.getAttribute('data-lazy-src')||'';if(!u&&i.getAttribute('srcset'))u=i.getAttribute('srcset').split(',').pop().trim().split(/\\s+/)[0];try{u=new URL(u,location.href).href;}catch(e){u='';}return {url:u,title:(i.alt||i.title||'Изображение').trim().slice(0,80),w:i.naturalWidth||i.width||0,h:i.naturalHeight||i.height||0};}).filter(function(i){if(!i.url||i.url.indexOf('https://')!==0||seen[i.url])return false;seen[i.url]=true;return i.w>=80&&i.h>=60;}).slice(0,5);return JSON.stringify({title:document.title||location.hostname,url:location.href,text:(document.body&&document.body.innerText||'').slice(0,54000),links:links,images:images});})()"
                 view.evaluateJavascript(script) { result ->
                     try {
                         val encoded = org.json.JSONTokener(result ?: "\"\"").nextValue() as? String ?: throw IllegalStateException("Empty page response")
@@ -144,10 +144,12 @@ class MainActivity : ComponentActivity() {
                                 downloadAndCompressImage(imageUrl, page.url)?.let { PageImage(title, it) }
                             }
                             runOnUiThread {
-                                status = if (pageImages.isEmpty()) {
-                                    "Sending page text and links..."
+                                status = if (imageCandidates.isEmpty()) {
+                                    "Images not found on this page. Sending text and links."
+                                } else if (pageImages.isEmpty()) {
+                                    "Found ${imageCandidates.size} image(s), but could not download them. Sending text and links."
                                 } else {
-                                    "Sending page with ${pageImages.size} image(s)..."
+                                    "Sending page with ${pageImages.size}/${imageCandidates.size} image(s)..."
                                 }
                                 bridge.send(page, pageImages) { message ->
                                     runOnUiThread {
