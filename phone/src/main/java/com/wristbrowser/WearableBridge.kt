@@ -3,8 +3,10 @@ package com.wristbrowser
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
+import android.util.Base64
 import com.xiaomi.xms.wearable.Wearable
 import com.xiaomi.xms.wearable.auth.Permission
+import com.xiaomi.xms.wearable.message.OnMessageReceivedListener
 import com.xiaomi.xms.wearable.node.Node
 import org.json.JSONObject
 import java.nio.charset.StandardCharsets
@@ -14,9 +16,16 @@ import java.util.concurrent.atomic.AtomicBoolean
 class WearableBridge(context: Context) {
     private val app = context.applicationContext
     @Volatile private var node: Node? = null
+    @Volatile private var commandListener: ((String) -> Unit)? = null
+    @Volatile private var listeningNodeId: String? = null
+
+    fun setCommandListener(listener: ((String) -> Unit)?) {
+        commandListener = listener
+    }
 
     fun connect(status: (String) -> Unit) {
         findNode(status) { found ->
+            registerCommandListener(found)
             authorizeAndOpen(found, status) {}
         }
     }
@@ -28,13 +37,62 @@ class WearableBridge(context: Context) {
             transferPage(connected, page, status)
             return
         }
-
         status("Ищем часы и настраиваем связь…")
         findNode(status) { found ->
+            registerCommandListener(found)
             authorizeAndOpen(found, status) {
                 status("Отправляем страницу…")
                 transferPage(found, page, status)
             }
+        }
+    }
+
+    fun sendBrowserImage(title: String, jpeg: ByteArray, status: (String) -> Unit) {
+        val target = node
+        if (target == null) {
+            status("Часы не подключены — открой WristBrowser и проверь связь.")
+            return
+        }
+        val encoded = Base64.encodeToString(jpeg, Base64.NO_WRAP)
+        val chunks = encoded.chunked(4800)
+        val id = UUID.randomUUID().toString()
+        val start = JSONObject().put("protocol", 1).put("type", "browser_image_start")
+            .put("id", id).put("title", title.take(120)).put("chunks", chunks.size).toString()
+        status("Передаю снимок страницы на часы…")
+        sendPayload(target.id, start, {
+            sendImagePart(target.id, id, chunks, 0, status)
+        }, { status("Не удалось начать передачу изображения: $it") })
+    }
+
+    private fun sendImagePart(id: String, transferId: String, chunks: List<String>, index: Int, status: (String) -> Unit) {
+        if (index >= chunks.size) {
+            val end = JSONObject().put("protocol", 1).put("type", "browser_image_end")
+                .put("id", transferId).toString()
+            sendPayload(id, end, { status("Изображение отправлено на часы.") },
+                { status("Ошибка завершения изображения: $it") })
+            return
+        }
+        val payload = JSONObject().put("protocol", 1).put("type", "browser_image_chunk")
+            .put("id", transferId).put("index", index).put("data", chunks[index]).toString()
+        sendPayload(id, payload, {
+            status("Снимок: ${index + 1}/${chunks.size}")
+            sendImagePart(id, transferId, chunks, index + 1, status)
+        }, { status("Ошибка части изображения ${index + 1}: $it") })
+    }
+
+    private fun registerCommandListener(target: Node) {
+        if (listeningNodeId == target.id) return
+        try {
+            Wearable.getMessageApi(app).addListener(
+                target.id,
+                OnMessageReceivedListener { _, data ->
+                    val message = try { String(data, StandardCharsets.UTF_8) } catch (_: Exception) { "" }
+                    if (message.isNotBlank()) commandListener?.invoke(message)
+                }
+            )
+            listeningNodeId = target.id
+        } catch (_: Throwable) {
+            // Keep the existing one-way page transfer usable if this firmware lacks inbound messages.
         }
     }
 
@@ -47,7 +105,6 @@ class WearableBridge(context: Context) {
             }
         }
         handler.postDelayed(timeout, 12_000)
-
         try {
             Wearable.getNodeApi(app).connectedNodes
                 .addOnSuccessListener { nodes ->
@@ -128,10 +185,8 @@ class WearableBridge(context: Context) {
     private fun transferPage(target: Node, page: WebPage, status: (String) -> Unit) {
         val transferId = UUID.randomUUID().toString()
         val chunks = splitUtf16Safely(page.text, 900)
-        val start = JSONObject()
-            .put("protocol", 1).put("type", "page_start").put("id", transferId)
-            .put("url", page.url).put("title", page.title).put("chunks", chunks.size)
-            .toString()
+        val start = JSONObject().put("protocol", 1).put("type", "page_start").put("id", transferId)
+            .put("url", page.url).put("title", page.title).put("chunks", chunks.size).toString()
         status("Подготовлено частей: ${chunks.size}")
         sendPayload(target.id, start,
             { sendPart(target.id, transferId, chunks, 0, status) },
