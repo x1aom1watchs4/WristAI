@@ -178,9 +178,13 @@ export default {
           buffer: buffer,
           success: () => {
             this.imageData = 'internal://cache/wristbrowser-screen.jpg'
-            this.status = 'Страница загружена. Нажимай по ссылкам или прокручивай'
+            this.status = 'Снимок сохранён. Показываю страницу…'
+            this.sendCommand('browser_image_ack', { id: this.transferId, ok: true })
           },
-          fail: (e, code) => { this.status = 'Ошибка сохранения снимка: ' + code }
+          fail: (e, code) => {
+            this.status = 'Ошибка сохранения снимка: ' + code
+            this.sendCommand('browser_image_ack', { id: this.transferId, ok: false, error: String(code || 'ошибка файла') })
+          }
         })
       } catch (e) {
         this.status = 'Не удалось обработать изображение'
@@ -222,6 +226,7 @@ export default {
   flex-direction: column;
   padding: 18px 24px;
   background-color: #101820;
+  font-family: sans-serif;
 }
 .brand { color: #8ed6c5; font-size: 22px; font-weight: bold; margin-bottom: 4px; }
 .status { color: #9aa7b2; font-size: 14px; margin-bottom: 5px; }
