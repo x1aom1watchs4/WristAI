@@ -293,7 +293,7 @@ export default {
 </script>
 
 <style>
-text {
+.page {
   width: 466px;
   height: 466px;
   flex-direction: column;
