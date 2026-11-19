@@ -256,15 +256,6 @@ export default {
     }
     this.status = 'Эта ссылка не поддерживается'
   },
-
-    const target = String(url || '')
-    if (!target || target.indexOf('https://') !== 0) {
-      this.status = 'Эта ссылка не поддерживается'
-      return
-    }
-    this.sendCommand('open_link', {url: target})
-    this.status = 'Открываем ссылку…'
-  },
   showKeyboard() { this.keyboardVisible = true },
   hideKeyboard() { this.keyboardVisible = false },
   appendKey(key) { this.query = String(this.query || '') + String(key || '') },
@@ -280,6 +271,7 @@ export default {
 </script>
 
 <style>
+text { font-family: "Noto Sans", "Roboto", sans-serif; }
 .page { font-family: "Noto Sans", "Roboto", sans-serif;
   width: 466px;
   height: 466px;
