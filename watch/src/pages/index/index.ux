@@ -234,7 +234,29 @@ export default {
     })
   },
 
-  openLink(url) {
+  onImageComplete() {
+    this.status = 'Изображение отображено'
+  },
+  onImageError() {
+    this.status = 'Файл получен, но часы не смогли показать изображение'
+  },
+  openLink(item) {
+    const link = item && typeof item === 'object' ? item : {url: item}
+    const target = String(link.url || '')
+    if (target.indexOf('https://') === 0) {
+      this.sendCommand('open_link', {url: target})
+      this.status = 'Открываем ссылку…'
+      return
+    }
+    const actionId = String(link.actionId || '')
+    if (/^wrist-[0-9]{1,3}$/.test(actionId)) {
+      this.sendCommand('click_element', {actionId: actionId})
+      this.status = 'Открываем раздел…'
+      return
+    }
+    this.status = 'Эта ссылка не поддерживается'
+  },
+
     const target = String(url || '')
     if (!target || target.indexOf('https://') !== 0) {
       this.status = 'Эта ссылка не поддерживается'
