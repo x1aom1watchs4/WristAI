@@ -1,6 +1,6 @@
 <template>
   <div class="page">
-    <text class="brand">WristBrowser</text>
+    <text class="brand" if="{{!keyboardVisible}}">WristBrowser</text>
     <text class="status">{{status}}</text>
     <div class="toolbar">
       <text class="address" @click="showKeyboard">{{query || 'Поиск или адрес сайта'}}</text>
@@ -8,11 +8,12 @@
     </div>
     <div class="controls">
       <input type="button" class="control" value="BACK" @click="sendCommand('back')" />
+      <input type="button" class="control" value="↑ ВВЕРХ" @click="sendCommand('scroll', {delta: -420})" />
+      <input type="button" class="control" value="↓ ВНИЗ" @click="sendCommand('scroll', {delta: 420})" />
       <input type="button" class="control" value="NEXT" @click="sendCommand('forward')" />
-      <input type="button" class="control" value="↻" @click="sendCommand('reload')" />
     </div>
-    <text class="heading">{{pageTitle}}</text>
-    <text class="url">{{pageUrl}}</text>
+    <text class="heading" if="{{!keyboardVisible}}">{{pageTitle}}</text>
+    <text class="url" if="{{!keyboardVisible}}">{{pageUrl}}</text>
     <div if="{{!keyboardVisible}}" class="readerArea">
       <scroll class="reader" scroll-y="true" scroll-x="false">
         <div class="imageList" if="{{pageImages.length > 0}}">
@@ -24,7 +25,8 @@
         </div>
       </scroll>
     </div>
-    <div if="{{keyboardVisible}}" class="keyboard">
+    <scroll if="{{keyboardVisible}}" class="keyboardScroll" scroll-y="true" scroll-x="false">
+    <div class="keyboard">
       <text class="typed">{{query}}_</text>
       <text class="layoutToggle" @click="toggleKeyboardLanguage">{{keyboardLanguage === 'ru' ? 'РУССКАЯ РАСКЛАДКА' : 'ENGLISH LAYOUT'}}</text>
       <div class="keyRow" if="{{keyboardLanguage === 'en'}}">
@@ -53,9 +55,10 @@
         <text class="key special" @click="appendKey('/')">/</text>
         <text class="key goKey" @click="submitSearch">GO</text>
       </div>
-      <text class="cancel" @click="hideKeyboard">CLOSE</text>
+      <text class="cancel" @click="hideKeyboard">ЗАКРЫТЬ КЛАВИАТУРУ</text>
     </div>
-    <text class="hint">Листай текст пальцем вверх и вниз прямо на часах</text>
+    </scroll>
+    <text class="hint" if="{{!keyboardVisible}}">Листай текст или нажимай ↑ ВВЕРХ / ↓ ВНИЗ</text>
   </div>
 </template>
 
@@ -342,7 +345,7 @@ export default {
 .address { width: 345px; height: 40px; color: #ffffff; background-color: #263440; font-size: 15px; padding: 10px; }
 .go { width: 68px; height: 40px; color: #101820; background-color: #8ed6c5; font-size: 14px; margin-left: 6px; }
 .controls { width: 420px; height: 34px; flex-direction: row; justify-content: space-between; margin-bottom: 5px; }
-.control { width: 130px; height: 32px; color: #101820; background-color: #8ed6c5; font-size: 13px; }
+.control { width: 100px; height: 32px; color: #101820; background-color: #8ed6c5; font-size: 12px; }
 .heading { width: 420px; color: #ffffff; font-size: 18px; font-weight: bold; max-lines: 2; margin-bottom: 2px; }
 .url { width: 420px; color: #91a1ad; font-size: 10px; max-lines: 1; margin-bottom: 5px; }
 .readerArea { width: 420px; height: 285px; }
@@ -353,11 +356,13 @@ export default {
 .linkList { width: 410px; flex-direction: column; margin-top: 8px; }
 .link { width: 405px; color: #8ed6c5; font-size: 15px; padding: 8px 4px; border-bottom: 1px solid #344653; }
 .hint { width: 420px; color: #8797a3; font-size: 10px; text-align: center; margin-top: 5px; }
+.keyboardScroll { width: 430px; height: 340px; }
 .keyboard { width: 430px; flex-direction: column; align-items: center; }
+.keyRow { width: 430px; height: 43px; flex-direction: row; justify-content: center; align-items: center; margin-bottom: 4px; }
+.key { min-width: 29px; height: 38px; color: #ffffff; background-color: #344653; font-size: 14px; text-align: center; padding: 10px 2px; margin-left: 1px; margin-right: 1px; }
  .layoutToggle { color: #8ed6c5; font-size: 11px; padding: 3px; }
 .typed { width: 410px; height: 38px; color: #ffffff; background-color: #263440; font-size: 16px; text-align: center; padding: 8px; margin-bottom: 5px; }
-.keyRow { width: 430px; height: 43px; flex-direction: row; justify-content: center; align-items: center; margin-bottom: 4px; }
-.key { min-width: 32px; height: 38px; color: #ffffff; background-color: #344653; font-size: 15px; text-align: center; padding: 10px 3px; margin-left: 2px; margin-right: 2px; }
+
 .special { background-color: #526675; }
 .spaceKey { width: 105px; font-size: 11px; }
 .goKey { width: 48px; color: #101820; background-color: #8ed6c5; font-size: 13px; }
