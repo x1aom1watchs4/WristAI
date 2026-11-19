@@ -4,6 +4,7 @@
     <text class="status">{{status}}</text>
     <div class="toolbar">
       <text class="address" @click="showKeyboard">{{query || 'Поиск или адрес сайта'}}</text>
+      <input type="button" class="keyboardButton" value="КЛАВ" @click="showKeyboard" />
       <input type="button" class="go" value="GO" @click="submitSearch" />
     </div>
     <div class="controls" if="{{!keyboardVisible}}">
@@ -39,14 +40,13 @@
         <text class="key special" @click="deleteKey">⌫</text>
       </div>
       <div class="keyRow" if="{{keyboardLanguage === 'ru'}}">
-        <text class="key" for="{{item in ruRow1}}" @click="appendKey(item)">{{item}}</text>
+        <text class="key" @click="appendKey('Й')">Й</text><text class="key" @click="appendKey('Ц')">Ц</text><text class="key" @click="appendKey('У')">У</text><text class="key" @click="appendKey('К')">К</text><text class="key" @click="appendKey('Е')">Е</text><text class="key" @click="appendKey('Н')">Н</text><text class="key" @click="appendKey('Г')">Г</text><text class="key" @click="appendKey('Ш')">Ш</text><text class="key" @click="appendKey('Щ')">Щ</text><text class="key" @click="appendKey('З')">З</text><text class="key" @click="appendKey('Х')">Х</text>
       </div>
       <div class="keyRow" if="{{keyboardLanguage === 'ru'}}">
-        <text class="key" for="{{item in ruRow2}}" @click="appendKey(item)">{{item}}</text>
+        <text class="key" @click="appendKey('Ф')">Ф</text><text class="key" @click="appendKey('Ы')">Ы</text><text class="key" @click="appendKey('В')">В</text><text class="key" @click="appendKey('А')">А</text><text class="key" @click="appendKey('П')">П</text><text class="key" @click="appendKey('Р')">Р</text><text class="key" @click="appendKey('О')">О</text><text class="key" @click="appendKey('Л')">Л</text><text class="key" @click="appendKey('Д')">Д</text><text class="key" @click="appendKey('Ж')">Ж</text><text class="key" @click="appendKey('Э')">Э</text>
       </div>
       <div class="keyRow" if="{{keyboardLanguage === 'ru'}}">
-        <text class="key" for="{{item in ruRow3}}" @click="appendKey(item)">{{item}}</text>
-        <text class="key special" @click="deleteKey">⌫</text>
+        <text class="key" @click="appendKey('Я')">Я</text><text class="key" @click="appendKey('Ч')">Ч</text><text class="key" @click="appendKey('С')">С</text><text class="key" @click="appendKey('М')">М</text><text class="key" @click="appendKey('И')">И</text><text class="key" @click="appendKey('Т')">Т</text><text class="key" @click="appendKey('Ь')">Ь</text><text class="key" @click="appendKey('Б')">Б</text><text class="key" @click="appendKey('Ю')">Ю</text><text class="key special" @click="deleteKey">⌫</text>
       </div>
       <div class="keyRow">
         <text class="key special" @click="appendKey('.')">.</text>
@@ -340,8 +340,9 @@ export default {
 .brand { color: #8ed6c5; font-size: 20px; font-weight: bold; margin-bottom: 3px; }
 .status { width: 420px; color: #8ed6c5; font-size: 13px; text-align: center; margin-bottom: 6px; }
 .toolbar { width: 420px; height: 42px; flex-direction: row; align-items: center; margin-bottom: 5px; }
-.address { width: 345px; height: 40px; color: #ffffff; background-color: #263440; font-size: 15px; padding: 10px; }
-.go { width: 68px; height: 40px; color: #101820; background-color: #8ed6c5; font-size: 14px; margin-left: 6px; }
+.address { width: 260px; height: 40px; color: #ffffff; background-color: #263440; font-size: 14px; padding: 8px; }
+.keyboardButton { width: 76px; height: 40px; color: #ffffff; background-color: #526675; font-size: 12px; margin-left: 4px; }
+.go { width: 68px; height: 40px; color: #101820; background-color: #8ed6c5; font-size: 14px; margin-left: 4px; }
 .controls { width: 420px; height: 34px; flex-direction: row; justify-content: space-between; margin-bottom: 5px; }
 .control { width: 100px; height: 32px; color: #101820; background-color: #8ed6c5; font-size: 12px; }
 .heading { width: 420px; color: #ffffff; font-size: 18px; font-weight: bold; max-lines: 2; margin-bottom: 2px; }
