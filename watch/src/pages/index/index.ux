@@ -315,7 +315,7 @@ export default {
     if (!value) return
     this.keyboardVisible = false
     if (this.typingIntoPage) {
-      this.sendCommand('type_text', {text: value})
+      this.sendCommand('type_text', {text: value, submit: true})
       this.typingIntoPage = false
       this.status = 'Вводим текст на странице…'
     } else {
