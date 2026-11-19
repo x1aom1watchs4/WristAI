@@ -159,6 +159,7 @@ export default {
       if (index < 0 || index >= this.imageExpectedChunks) return
       this.imageChunks[index] = message.data || ''
       this.imageReceivedChunks = this.imageChunks.filter((part) => typeof part === 'string').length
+      this.sendCommand('browser_image_chunk_ack', {id: this.imageTransferId, index: index})
       this.status = 'Изображение: ' + this.imageReceivedChunks + '/' + this.imageExpectedChunks
     } else if (message.type === 'browser_image_end') {
       if (message.id !== this.imageTransferId) return
@@ -271,8 +272,8 @@ export default {
 </script>
 
 <style>
-text { font-family: "Noto Sans", "Roboto", sans-serif; }
-.page { font-family: "Noto Sans", "Roboto", sans-serif;
+text { font-family: sans-serif; }
+.page { font-family: sans-serif;
   width: 466px;
   height: 466px;
   flex-direction: column;
