@@ -318,6 +318,44 @@ class MainActivity : ComponentActivity() {
                                         }
                                     }
                                 }
+                                "scroll" -> {
+                                    val delta = command.optInt("delta", 420).coerceIn(-1200, 1200)
+                                    val view = browserView
+                                    if (view != null && pageReady && !pageLoading) {
+                                        view.evaluateJavascript("window.scrollBy({top:$delta,left:0,behavior:'instant'});true;") {
+                                            mainHandler.postDelayed({ if (pageReady && !pageLoading) captureAndSend(view) }, 450)
+                                        }
+                                    } else {
+                                        status = "Страница ещё загружается."
+                                    }
+                                }
+                                "back" -> {
+                                    val view = browserView
+                                    if (view != null && view.canGoBack()) {
+                                        sendAfterLoad = true
+                                        pageReady = false
+                                        view.goBack()
+                                        status = "Возвращаемся назад…"
+                                    } else status = "Нет предыдущей страницы."
+                                }
+                                "forward" -> {
+                                    val view = browserView
+                                    if (view != null && view.canGoForward()) {
+                                        sendAfterLoad = true
+                                        pageReady = false
+                                        view.goForward()
+                                        status = "Переходим вперёд…"
+                                    } else status = "Нет следующей страницы."
+                                }
+                                "reload" -> {
+                                    val view = browserView
+                                    if (view != null) {
+                                        sendAfterLoad = true
+                                        pageReady = false
+                                        view.reload()
+                                        status = "Обновляем страницу…"
+                                    }
+                                }
                                 "click_element" -> {
                                     val actionId = command.optString("actionId")
                                     val view = browserView
