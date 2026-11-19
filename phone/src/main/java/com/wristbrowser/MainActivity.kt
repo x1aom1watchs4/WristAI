@@ -97,6 +97,44 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private fun captureWebViewSnapshot(view: WebView): ByteArray? {
+        var source: Bitmap? = null
+        var scaled: Bitmap? = null
+        var rgb: Bitmap? = null
+        try {
+            val width = view.width
+            val height = view.height
+            if (width < 2 || height < 2) return null
+            source = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+            view.draw(Canvas(source))
+            val scale = minOf(320f / width, 200f / height, 1f)
+            val targetWidth = maxOf(1, (width * scale).toInt())
+            val targetHeight = maxOf(1, (height * scale).toInt())
+            scaled = if (targetWidth != width || targetHeight != height) {
+                Bitmap.createScaledBitmap(source, targetWidth, targetHeight, true)
+            } else source
+            rgb = Bitmap.createBitmap(targetWidth, targetHeight, Bitmap.Config.RGB_565)
+            Canvas(rgb).apply {
+                drawColor(Color.WHITE)
+                drawBitmap(scaled, 0f, 0f, null)
+            }
+            val output = ByteArrayOutputStream()
+            var quality = 76
+            do {
+                output.reset()
+                rgb.compress(Bitmap.CompressFormat.JPEG, quality, output)
+                quality -= 8
+            } while (output.size() > 78 * 1024 && quality >= 40)
+            return output.toByteArray().takeIf { it.size <= 80 * 1024 }
+        } catch (_: Exception) {
+            return null
+        } finally {
+            if (rgb != null && rgb !== source && rgb !== scaled) rgb.recycle()
+            if (scaled != null && scaled !== source) scaled.recycle()
+            source?.recycle()
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
@@ -179,13 +217,15 @@ class MainActivity : ComponentActivity() {
                         val encoded = org.json.JSONTokener(result ?: "\"\"").nextValue() as? String ?: throw IllegalStateException("Empty page response")
                         val pageData = JSONObject(encoded)
                         val normalizedText = Normalizer.normalize(pageData.optString("text", ""), Normalizer.Form.NFC)
+                        val snapshot = captureWebViewSnapshot(view)
                         val page = WebPage(
                             pageData.optString("url", view.url ?: ""),
                             pageData.optString("title", view.title ?: "Web page"),
-                            normalizedText + "\n\n__WRIST_LINKS__\n" +
+                            (if (snapshot != null) "__WRIST_VISUAL_PAGE__" else normalizedText) +
+                                "\n\n__WRIST_LINKS__\n" +
                                 (pageData.optJSONArray("links")?.toString() ?: "[]")
                         )
-                        if (page.text.isBlank()) throw IllegalStateException("No readable page text")
+                        if (page.text.isBlank()) throw IllegalStateException("No page content found")
                         val imageCandidates = mutableListOf<Pair<String, String>>()
                         val imageArray = pageData.optJSONArray("images")
                         if (imageArray != null) {
@@ -198,16 +238,20 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                         Thread {
-                            val pageImages = imageCandidates.mapNotNull { (title, imageUrl) ->
-                                downloadAndCompressImage(imageUrl, page.url)?.let { PageImage(title, it) }
+                            val pageImages = mutableListOf<PageImage>()
+                            if (snapshot != null) pageImages.add(0, PageImage("Снимок страницы", snapshot))
+                            imageCandidates.take(if (snapshot != null) 4 else 5).forEach { (title, imageUrl) ->
+                                downloadAndCompressImage(imageUrl, page.url)?.let { pageImages.add(PageImage(title, it)) }
                             }
                             runOnUiThread {
-                                status = if (imageCandidates.isEmpty()) {
-                                    "Images not found on this page. Sending text and links."
+                                status = if (snapshot != null) {
+                                    "Sending visual page and links: ${pageImages.size} image(s)..."
+                                } else if (imageCandidates.isEmpty()) {
+                                    "Screenshot unavailable; sending readable text and links."
                                 } else if (pageImages.isEmpty()) {
-                                    "Found ${imageCandidates.size} image(s), but could not download them. Sending text and links."
+                                    "Screenshot unavailable; page images could not be downloaded. Sending text."
                                 } else {
-                                    "Sending page with ${pageImages.size}/${imageCandidates.size} image(s)..."
+                                    "Sending page with ${pageImages.size} image(s)..."
                                 }
                                 bridge.send(page, pageImages) { message ->
                                     runOnUiThread {
