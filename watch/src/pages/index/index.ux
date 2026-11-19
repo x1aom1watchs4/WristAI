@@ -40,13 +40,42 @@
         <text class="key special" @click="deleteKey">⌫</text>
       </div>
       <div class="keyRow" if="{{keyboardLanguage === 'ru'}}">
-        <text class="key" @click="appendKey('Й')">Й</text><text class="key" @click="appendKey('Ц')">Ц</text><text class="key" @click="appendKey('У')">У</text><text class="key" @click="appendKey('К')">К</text><text class="key" @click="appendKey('Е')">Е</text><text class="key" @click="appendKey('Н')">Н</text><text class="key" @click="appendKey('Г')">Г</text><text class="key" @click="appendKey('Ш')">Ш</text><text class="key" @click="appendKey('Щ')">Щ</text><text class="key" @click="appendKey('З')">З</text><text class="key" @click="appendKey('Х')">Х</text>
+        <div class="key imageKey" @click="appendKey('Й')"><image class="glyph" src="/common/keyboard/u0419.png" /></div>
+        <div class="key imageKey" @click="appendKey('Ц')"><image class="glyph" src="/common/keyboard/u0426.png" /></div>
+        <div class="key imageKey" @click="appendKey('У')"><image class="glyph" src="/common/keyboard/u0423.png" /></div>
+        <div class="key imageKey" @click="appendKey('К')"><image class="glyph" src="/common/keyboard/u041A.png" /></div>
+        <div class="key imageKey" @click="appendKey('Е')"><image class="glyph" src="/common/keyboard/u0415.png" /></div>
+        <div class="key imageKey" @click="appendKey('Н')"><image class="glyph" src="/common/keyboard/u041D.png" /></div>
+        <div class="key imageKey" @click="appendKey('Г')"><image class="glyph" src="/common/keyboard/u0413.png" /></div>
+        <div class="key imageKey" @click="appendKey('Ш')"><image class="glyph" src="/common/keyboard/u0428.png" /></div>
+        <div class="key imageKey" @click="appendKey('Щ')"><image class="glyph" src="/common/keyboard/u0429.png" /></div>
+        <div class="key imageKey" @click="appendKey('З')"><image class="glyph" src="/common/keyboard/u0417.png" /></div>
+        <div class="key imageKey" @click="appendKey('Х')"><image class="glyph" src="/common/keyboard/u0425.png" /></div>
       </div>
       <div class="keyRow" if="{{keyboardLanguage === 'ru'}}">
-        <text class="key" @click="appendKey('Ф')">Ф</text><text class="key" @click="appendKey('Ы')">Ы</text><text class="key" @click="appendKey('В')">В</text><text class="key" @click="appendKey('А')">А</text><text class="key" @click="appendKey('П')">П</text><text class="key" @click="appendKey('Р')">Р</text><text class="key" @click="appendKey('О')">О</text><text class="key" @click="appendKey('Л')">Л</text><text class="key" @click="appendKey('Д')">Д</text><text class="key" @click="appendKey('Ж')">Ж</text><text class="key" @click="appendKey('Э')">Э</text>
+        <div class="key imageKey" @click="appendKey('Ф')"><image class="glyph" src="/common/keyboard/u0424.png" /></div>
+        <div class="key imageKey" @click="appendKey('Ы')"><image class="glyph" src="/common/keyboard/u042B.png" /></div>
+        <div class="key imageKey" @click="appendKey('В')"><image class="glyph" src="/common/keyboard/u0412.png" /></div>
+        <div class="key imageKey" @click="appendKey('А')"><image class="glyph" src="/common/keyboard/u0410.png" /></div>
+        <div class="key imageKey" @click="appendKey('П')"><image class="glyph" src="/common/keyboard/u041F.png" /></div>
+        <div class="key imageKey" @click="appendKey('Р')"><image class="glyph" src="/common/keyboard/u0420.png" /></div>
+        <div class="key imageKey" @click="appendKey('О')"><image class="glyph" src="/common/keyboard/u041E.png" /></div>
+        <div class="key imageKey" @click="appendKey('Л')"><image class="glyph" src="/common/keyboard/u041B.png" /></div>
+        <div class="key imageKey" @click="appendKey('Д')"><image class="glyph" src="/common/keyboard/u0414.png" /></div>
+        <div class="key imageKey" @click="appendKey('Ж')"><image class="glyph" src="/common/keyboard/u0416.png" /></div>
+        <div class="key imageKey" @click="appendKey('Э')"><image class="glyph" src="/common/keyboard/u042D.png" /></div>
       </div>
       <div class="keyRow" if="{{keyboardLanguage === 'ru'}}">
-        <text class="key" @click="appendKey('Я')">Я</text><text class="key" @click="appendKey('Ч')">Ч</text><text class="key" @click="appendKey('С')">С</text><text class="key" @click="appendKey('М')">М</text><text class="key" @click="appendKey('И')">И</text><text class="key" @click="appendKey('Т')">Т</text><text class="key" @click="appendKey('Ь')">Ь</text><text class="key" @click="appendKey('Б')">Б</text><text class="key" @click="appendKey('Ю')">Ю</text><text class="key special" @click="deleteKey">⌫</text>
+        <div class="key imageKey" @click="appendKey('Я')"><image class="glyph" src="/common/keyboard/u042F.png" /></div>
+        <div class="key imageKey" @click="appendKey('Ч')"><image class="glyph" src="/common/keyboard/u0427.png" /></div>
+        <div class="key imageKey" @click="appendKey('С')"><image class="glyph" src="/common/keyboard/u0421.png" /></div>
+        <div class="key imageKey" @click="appendKey('М')"><image class="glyph" src="/common/keyboard/u041C.png" /></div>
+        <div class="key imageKey" @click="appendKey('И')"><image class="glyph" src="/common/keyboard/u0418.png" /></div>
+        <div class="key imageKey" @click="appendKey('Т')"><image class="glyph" src="/common/keyboard/u0422.png" /></div>
+        <div class="key imageKey" @click="appendKey('Ь')"><image class="glyph" src="/common/keyboard/u042C.png" /></div>
+        <div class="key imageKey" @click="appendKey('Б')"><image class="glyph" src="/common/keyboard/u0411.png" /></div>
+        <div class="key imageKey" @click="appendKey('Ю')"><image class="glyph" src="/common/keyboard/u042E.png" /></div>
+        <text class="key special" @click="deleteKey">⌫</text>
       </div>
       <div class="keyRow">
         <text class="key special" @click="appendKey('.')">.</text>
@@ -358,6 +387,8 @@ export default {
 .keyboard { width: 430px; height: 330px; flex-direction: column; align-items: center; justify-content: flex-start; }
 .keyRow { width: 430px; height: 43px; flex-direction: row; justify-content: center; align-items: center; margin-bottom: 4px; }
 .key { min-width: 29px; height: 38px; color: #ffffff; background-color: #344653; font-size: 14px; text-align: center; padding: 8px 2px; margin-left: 1px; margin-right: 1px; }
+.imageKey { width: 32px; min-width: 32px; height: 38px; padding: 2px; align-items: center; justify-content: center; }
+.glyph { width: 30px; height: 30px; object-fit: contain; }
  .layoutToggle { color: #8ed6c5; font-size: 11px; padding: 3px; }
 .typed { width: 410px; height: 38px; color: #ffffff; background-color: #263440; font-size: 16px; text-align: center; padding: 8px; margin-bottom: 5px; }
 
