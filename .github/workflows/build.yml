@@ -104,6 +104,12 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: '20'
+      - name: Generate Cyrillic keyboard glyph images
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y python3-pil fonts-dejavu-core
+          python3 watch/scripts/generate_keyboard_glyphs.py
       - name: Install Vela dependencies
         working-directory: watch
         run: npm install --no-audit --no-fund
