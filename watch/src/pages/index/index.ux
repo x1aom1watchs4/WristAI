@@ -20,7 +20,7 @@
           <image for="{{item in pageImages}}" src="{{item.uri}}" class="pageImage" @complete="onImageComplete" @error="onImageError" />
         </div>
         <div class="linkList">
-          <text class="link" for="{{item in pageLinks}}" @click="openLink(item.url)">{{item.title}}</text>
+          <text class="link" for="{{item in pageLinks}}" @click="openLink(item)">{{item.title}}</text>
         </div>
       </scroll>
     </div>
