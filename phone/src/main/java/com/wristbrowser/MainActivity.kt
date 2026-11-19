@@ -115,7 +115,65 @@ class MainActivity : ComponentActivity() {
                 if (sendingImage) { capturePending = true; return }
                 sendingImage = true
                 status = "Preparing text and images for watch..."
-                val script = "(function(){var links=Array.from(document.querySelectorAll('a[href]')).filter(function(a){return a.href&&a.href.indexOf('https://')===0;}).slice(0,40).map(function(a){return {title:((a.innerText||a.getAttribute('aria-label')||a.href).trim().replace(/\\s+/g,' ').slice(0,90)),url:a.href};}).filter(function(a){return a.title;});var seen={};var imageNodes=Array.from(document.querySelectorAll('img,picture source,[style]'));var images=imageNodes.map(function(i){var style=getComputedStyle(i);var bg=style.backgroundImage||'';if(bg.indexOf('url(')===0){bg=bg.slice(4,-1).trim();var first=bg.charCodeAt(0);if(first===34||first===39)bg=bg.slice(1,-1);}else{bg='';}var candidates=[i.getAttribute('data-src'),i.getAttribute('data-original'),i.getAttribute('data-lazy-src'),i.getAttribute('src'),i.currentSrc,i.getAttribute('srcset'),i.getAttribute('data-srcset'),bg];var u='';for(var c of candidates){if(!c)continue;c=String(c).trim();if(c.indexOf(',')>=0)c=c.split(',').pop().trim().split(/\\s+/)[0];if(!c||c.indexOf('data:')===0||c.indexOf('blob:')===0)continue;try{var resolved=new URL(c,location.href).href;if(resolved.indexOf('https://')===0){u=resolved;break;}}catch(e){}}return {url:u,title:(i.alt||i.title||'Изображение').trim().slice(0,80)};}).filter(function(i){if(!i.url||seen[i.url])return false;seen[i.url]=true;return true;}).slice(0,5);return JSON.stringify({title:document.title||location.hostname,url:location.href,text:(document.body&&document.body.innerText||'').slice(0,54000),links:links,images:images});})()"
+                val script = """(function(){
+                    var links=[], linkSeen={};
+                    var clickable=Array.from(document.querySelectorAll('a[href],button,[role="link"],[role="button"],[onclick],[data-href],[data-url],input[type="button"],input[type="submit"]')).slice(0,120);
+                    clickable.forEach(function(e,n){
+                        var title=String(e.innerText||e.getAttribute('aria-label')||e.value||e.title||'').trim().replace(/\s+/g,' ').slice(0,90);
+                        if(!title)return;
+                        var raw=e.href||e.getAttribute('href')||e.getAttribute('data-href')||e.getAttribute('data-url')||'';
+                        var url='';
+                        if(raw){try{var resolved=new URL(raw,location.href).href;if(resolved.indexOf('https://')===0)url=resolved;}catch(ignore){}}
+                        var actionId='wrist-'+n;
+                        e.setAttribute('data-wrist-action',actionId);
+                        var key=url||actionId;
+                        if(!linkSeen[key]){linkSeen[key]=true;links.push({title:title,url:url,actionId:actionId});}
+                    });
+                    var imageNodes=Array.from(document.querySelectorAll('img,picture source,[style],[class]')).slice(0,900);
+                    var images=[], seen={};
+                    function addCandidate(raw,title){
+                        if(!raw)return;
+                        raw=String(raw).trim();
+                        if(raw.indexOf(',')>=0){
+                            var choices=raw.split(',').map(function(part){
+                                var bits=part.trim().split(/\s+/);var score=0;
+                                if(bits.length>1){var v=parseFloat(bits[1]);if(!isNaN(v))score=v*(bits[1].indexOf('x')>=0?1000:1);}
+                                return {url:bits[0],score:score};
+                            }).sort(function(a,b){return b.score-a.score;});
+                            raw=choices.length?choices[0].url:'';
+                        } else raw=raw.split(/\s+/)[0];
+                        if(!raw||raw.indexOf('data:')===0||raw.indexOf('blob:')===0)return;
+                        try{
+                            var u=new URL(raw,location.href).href;
+                            if(u.indexOf('https://')!==0||seen[u])return;
+                            seen[u]=true;images.push({url:u,title:title||'Изображение'});
+                        }catch(ignore){}
+                    }
+                    imageNodes.forEach(function(e){
+                        if(images.length>=5)return;
+                        var title=e.alt||e.title||e.getAttribute('aria-label')||'Изображение';
+                        var candidates=[];
+                        if(e.tagName==='IMG'||e.tagName==='SOURCE'){
+                            candidates=[e.getAttribute('data-src'),e.getAttribute('data-original'),e.getAttribute('data-lazy-src'),e.getAttribute('data-url'),e.getAttribute('data-srcset'),e.getAttribute('srcset'),e.currentSrc,e.getAttribute('src')];
+                            if(e.tagName==='IMG'&&e.loading==='lazy')e.loading='eager';
+                        }
+                        candidates.forEach(function(c){if(images.length<5)addCandidate(c,title);});
+                        if(images.length<5){
+                            try{
+                                var bg=getComputedStyle(e).backgroundImage||'';
+                                var matches=bg.matchAll(/url\((['"]?)(.*?)\1\)/g);
+                                for(var m of matches){addCandidate(m[2],title);if(images.length>=5)break;}
+                            }catch(ignore){}
+                        }
+                    });
+                    return JSON.stringify({
+                        title:document.title||location.hostname,
+                        url:location.href,
+                        text:(document.body&&document.body.innerText||'').slice(0,54000),
+                        links:links.slice(0,80),
+                        images:images.slice(0,5)
+                    });
+                })()"""
                 view.evaluateJavascript(script) { result ->
                     try {
                         val encoded = org.json.JSONTokener(result ?: "\"\"").nextValue() as? String ?: throw IllegalStateException("Empty page response")
@@ -212,6 +270,20 @@ class MainActivity : ComponentActivity() {
                                         } else {
                                             "Watch could not save image: " + command.optString("error", "unknown error")
                                         }
+                                    }
+                                }
+                                "click_element" -> {
+                                    val actionId = command.optString("actionId")
+                                    val view = browserView
+                                    if (actionId.matches(Regex("^wrist-[0-9]{1,3}$")) && view != null) {
+                                        val actionLiteral = JSONObject.quote(actionId)
+                                        val script = "(function(){var a=document.querySelectorAll('[data-wrist-action]');for(var i=0;i<a.length;i++){if(a[i].getAttribute('data-wrist-action')===$actionLiteral){a[i].click();return 'clicked';}}return 'not-found';})()"
+                                        view.evaluateJavascript(script) { result ->
+                                            if (result == "\"not-found\"") status = "Элемент уже изменился. Обнови страницу."
+                                            else status = "Открываем раздел…"
+                                        }
+                                    } else {
+                                        status = "Не удалось открыть этот пункт."
                                     }
                                 }
                                 "open_link" -> {
