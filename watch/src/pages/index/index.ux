@@ -171,14 +171,35 @@ export default {
       const base64 = this.imageChunks.join('')
       const safeId = this.imageTransferId.replace(/[^a-zA-Z0-9_-]/g, '')
       const uri = 'internal://cache/wristbrowser-' + safeId + '.jpg'
+      const imageBytes = this.base64ToUint8Array(base64)
+      if (imageBytes.length < 4 || imageBytes[0] !== 255 || imageBytes[1] !== 216) {
+        this.sendCommand('browser_image_ack', {id: this.imageTransferId, ok: false, error: 'Полученные данные не являются JPEG'})
+        this.status = 'Полученные данные повреждены: JPEG не распознан'
+        this.imageChunks = []
+        return
+      }
       file.writeArrayBuffer({
         uri: uri,
-        buffer: this.base64ToUint8Array(base64),
+        buffer: imageBytes,
         success: () => {
-          this.pageImages = this.pageImages.concat([{uri: uri, title: this.imageTitle}])
-          this.sendCommand('browser_image_ack', {id: this.imageTransferId, ok: true})
-          this.status = 'Изображение добавлено на страницу'
-          this.imageChunks = []
+          file.get({
+            uri: uri,
+            success: (info) => {
+              if (!info || Number(info.length || 0) !== imageBytes.length) {
+                this.sendCommand('browser_image_ack', {id: this.imageTransferId, ok: false, error: 'Размер сохранённого файла не совпадает'})
+                this.status = 'Файл записан не полностью'
+                return
+              }
+              this.pageImages = this.pageImages.concat([{uri: uri, title: this.imageTitle}])
+              this.sendCommand('browser_image_ack', {id: this.imageTransferId, ok: true, bytes: info.length})
+              this.status = 'Изображение сохранено: ' + info.length + ' байт'
+              this.imageChunks = []
+            },
+            fail: (error, code) => {
+              this.sendCommand('browser_image_ack', {id: this.imageTransferId, ok: false, error: 'file verify error ' + String(code || '')})
+              this.status = 'Не удалось проверить сохранённый файл'
+            }
+          })
         },
         fail: (error, code) => {
           this.sendCommand('browser_image_ack', {id: this.imageTransferId, ok: false, error: 'file error ' + String(code || '')})
@@ -272,8 +293,7 @@ export default {
 </script>
 
 <style>
-text { font-family: sans-serif; }
-.page { font-family: sans-serif;
+text {
   width: 466px;
   height: 466px;
   flex-direction: column;
