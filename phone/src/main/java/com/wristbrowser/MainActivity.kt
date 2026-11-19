@@ -376,13 +376,27 @@ class MainActivity : ComponentActivity() {
                                 }
                                 "type_text" -> {
                                     val textLiteral = JSONObject.quote(command.optString("text").take(500))
+                                    val submit = command.optBoolean("submit", false)
                                     val view = browserView
                                     if (view != null && pageReady && !pageLoading) {
-                                        val script = "(function(){var e=document.activeElement;if(!e)return 'no-focus';if(e.isContentEditable){document.execCommand('insertText',false,$textLiteral);}else if(e.matches('input,textarea')){var p=e.tagName==='TEXTAREA'?HTMLTextAreaElement.prototype:HTMLInputElement.prototype;var d=Object.getOwnPropertyDescriptor(p,'value');if(d&&d.set)d.set.call(e,(e.value||'')+$textLiteral);else e.value=(e.value||'')+$textLiteral;e.dispatchEvent(new Event('input',{bubbles:true}));e.dispatchEvent(new Event('change',{bubbles:true}));}else{return 'not-editable';}return 'typed';})()"
-                                        view.evaluateJavascript(script) {
-                                            status = "Текст отправлен в поле."
-                                            mainHandler.postDelayed({ if (pageReady && !pageLoading) captureAndSend(view) }, 500)
+                                        val submitLiteral = submit.toString()
+                                        val script = "(function(){var e=document.activeElement;if(!e)return 'no-focus';if(e.isContentEditable){document.execCommand('insertText',false,$textLiteral);}else if(e.matches('input,textarea')){var p=e.tagName==='TEXTAREA'?HTMLTextAreaElement.prototype:HTMLInputElement.prototype;var d=Object.getOwnPropertyDescriptor(p,'value');if(d&&d.set)d.set.call(e,(e.value||'')+$textLiteral);else e.value=(e.value||'')+$textLiteral;e.dispatchEvent(new Event('input',{bubbles:true}));e.dispatchEvent(new Event('change',{bubbles:true}));}else{return 'not-editable';}if($submitLiteral){var f=e.form;if(f&&f.requestSubmit){f.requestSubmit();}else{e.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',code:'Enter',keyCode:13,which:13,bubbles:true}));e.dispatchEvent(new KeyboardEvent('keyup',{key:'Enter',code:'Enter',keyCode:13,which:13,bubbles:true}));}}return 'typed';})()"
+                                        view.evaluateJavascript(script) { result ->
+                                            status = if (submit) "Отправляем запрос со страницы…" else "Текст отправлен в поле."
+                                            if (submit) {
+                                                sendAfterLoad = true
+                                                mainHandler.postDelayed({
+                                                    if (sendAfterLoad && pageReady && !pageLoading) {
+                                                        sendAfterLoad = false
+                                                        captureAndSend(view)
+                                                    }
+                                                }, 1200)
+                                            } else {
+                                                mainHandler.postDelayed({ if (pageReady && !pageLoading) captureAndSend(view) }, 500)
+                                            }
                                         }
+                                    } else {
+                                        status = "Не удалось ввести текст: страница ещё не готова."
                                     }
                                 }
                                 "tap" -> {
