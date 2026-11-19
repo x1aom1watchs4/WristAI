@@ -17,7 +17,7 @@
       <scroll class="reader" scroll-y="true" scroll-x="false">
         <text class="body">{{pageText}}</text>
         <div class="imageList" if="{{pageImages.length > 0}}">
-          <image for="{{item in pageImages}}" src="{{item.uri}}" class="pageImage" />
+          <image for="{{item in pageImages}}" src="{{item.uri}}" class="pageImage" @complete="onImageComplete" @error="onImageError" />
         </div>
         <div class="linkList">
           <text class="link" for="{{item in pageLinks}}" @click="openLink(item.url)">{{item.title}}</text>
@@ -258,7 +258,7 @@ export default {
 </script>
 
 <style>
-.page {
+.page { font-family: "Noto Sans", "Roboto", sans-serif;
   width: 466px;
   height: 466px;
   flex-direction: column;
