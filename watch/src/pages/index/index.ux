@@ -6,7 +6,7 @@
       <text class="address" @click="showKeyboard">{{query || 'Поиск или адрес сайта'}}</text>
       <input type="button" class="go" value="GO" @click="submitSearch" />
     </div>
-    <div class="controls">
+    <div class="controls" if="{{!keyboardVisible}}">
       <input type="button" class="control" value="BACK" @click="sendCommand('back')" />
       <input type="button" class="control" value="↑ ВВЕРХ" @click="sendCommand('scroll', {delta: -420})" />
       <input type="button" class="control" value="↓ ВНИЗ" @click="sendCommand('scroll', {delta: 420})" />
