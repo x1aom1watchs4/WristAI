@@ -275,15 +275,36 @@ class MainActivity : ComponentActivity() {
                                 "click_element" -> {
                                     val actionId = command.optString("actionId")
                                     val view = browserView
-                                    if (actionId.matches(Regex("^wrist-[0-9]{1,3}$")) && view != null) {
+                                    if (actionId.matches(Regex("^wrist-[0-9]{1,3}$")) && view != null && pageReady && !pageLoading) {
                                         val actionLiteral = JSONObject.quote(actionId)
+                                        sendAfterLoad = true
                                         val script = "(function(){var a=document.querySelectorAll('[data-wrist-action]');for(var i=0;i<a.length;i++){if(a[i].getAttribute('data-wrist-action')===$actionLiteral){a[i].click();return 'clicked';}}return 'not-found';})()"
                                         view.evaluateJavascript(script) { result ->
-                                            if (result == "\"not-found\"") status = "Элемент уже изменился. Обнови страницу."
-                                            else status = "Открываем раздел…"
+                                            if (result == "\"not-found\"") {
+                                                sendAfterLoad = false
+                                                status = "Элемент уже изменился. Обнови страницу."
+                                            } else {
+                                                status = "Нажато. Обновляем страницу часов…"
+                                                mainHandler.postDelayed({
+                                                    if (sendAfterLoad && pageReady && !pageLoading) {
+                                                        sendAfterLoad = false
+                                                        captureAndSend(view)
+                                                    }
+                                                }, 1000)
+                                            }
                                         }
+                                        mainHandler.postDelayed({
+                                            if (sendAfterLoad && pageLoading) {
+                                                view.stopLoading()
+                                                pageLoading = false
+                                                pageReady = true
+                                                sendAfterLoad = false
+                                                status = "Переход не завершился; отправляем текущую страницу."
+                                                captureAndSend(view)
+                                            }
+                                        }, 10000)
                                     } else {
-                                        status = "Не удалось открыть этот пункт."
+                                        status = "Не удалось открыть этот пункт: страница ещё не готова."
                                     }
                                 }
                                 "open_link" -> {
