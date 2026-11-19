@@ -25,10 +25,9 @@
         </div>
       </scroll>
     </div>
-    <scroll if="{{keyboardVisible}}" class="keyboardScroll" scroll-y="true" scroll-x="false">
-    <div class="keyboard">
+    <div if="{{keyboardVisible}}" class="keyboard">
       <text class="typed">{{query}}_</text>
-      <text class="layoutToggle" @click="toggleKeyboardLanguage">{{keyboardLanguage === 'ru' ? 'РУССКАЯ РАСКЛАДКА' : 'ENGLISH LAYOUT'}}</text>
+      <text class="layoutToggle" @click="toggleKeyboardLanguage">{{keyboardLanguage === 'ru' ? 'РУС ✓  |  EN' : 'РУС  |  EN ✓'}}</text>
       <div class="keyRow" if="{{keyboardLanguage === 'en'}}">
         <text class="key" for="{{item in row1}}" @click="appendKey(item)">{{item}}</text>
       </div>
@@ -57,7 +56,6 @@
       </div>
       <text class="cancel" @click="hideKeyboard">ЗАКРЫТЬ КЛАВИАТУРУ</text>
     </div>
-    </scroll>
     <text class="hint" if="{{!keyboardVisible}}">Листай текст или нажимай ↑ ВВЕРХ / ↓ ВНИЗ</text>
   </div>
 </template>
@@ -356,10 +354,9 @@ export default {
 .linkList { width: 410px; flex-direction: column; margin-top: 8px; }
 .link { width: 405px; color: #8ed6c5; font-size: 15px; padding: 8px 4px; border-bottom: 1px solid #344653; }
 .hint { width: 420px; color: #8797a3; font-size: 10px; text-align: center; margin-top: 5px; }
-.keyboardScroll { width: 430px; height: 340px; }
-.keyboard { width: 430px; flex-direction: column; align-items: center; }
+.keyboard { width: 430px; height: 330px; flex-direction: column; align-items: center; justify-content: flex-start; }
 .keyRow { width: 430px; height: 43px; flex-direction: row; justify-content: center; align-items: center; margin-bottom: 4px; }
-.key { min-width: 29px; height: 38px; color: #ffffff; background-color: #344653; font-size: 14px; text-align: center; padding: 10px 2px; margin-left: 1px; margin-right: 1px; }
+.key { min-width: 29px; height: 38px; color: #ffffff; background-color: #344653; font-size: 14px; text-align: center; padding: 8px 2px; margin-left: 1px; margin-right: 1px; }
  .layoutToggle { color: #8ed6c5; font-size: 11px; padding: 3px; }
 .typed { width: 410px; height: 38px; color: #ffffff; background-color: #263440; font-size: 16px; text-align: center; padding: 8px; margin-bottom: 5px; }
 
