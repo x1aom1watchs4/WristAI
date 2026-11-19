@@ -78,7 +78,8 @@ class WearableBridge(context: Context) {
         index: Int,
         imageIndex: Int,
         images: List<PageImage>,
-        status: (String) -> Unit
+        status: (String) -> Unit,
+        attempt: Int = 0
     ) {
         if (index >= chunks.size) {
             val end = JSONObject().put("protocol", 1).put("type", "browser_image_end")
@@ -93,10 +94,16 @@ class WearableBridge(context: Context) {
         val ackKey = "$transferId:$index"
         val handler = Handler(Looper.getMainLooper())
         val completed = AtomicBoolean(false)
-        fun failChunk(reason: String) {
-            if (completed.compareAndSet(false, true)) {
-                imageChunkAcks.remove(ackKey)
-                status("Image chunk ${index + 1}/${chunks.size} was not acknowledged: $reason")
+        fun retryChunk(reason: String) {
+            if (!completed.compareAndSet(false, true)) return
+            imageChunkAcks.remove(ackKey)
+            handler.removeCallbacksAndMessages(ackKey)
+            if (attempt < 3) {
+                handler.postDelayed({
+                    sendImagePart(nodeId, transferId, chunks, index, imageIndex, images, status, attempt + 1)
+                }, 350L * (attempt + 1))
+            } else {
+                status("Image chunk ${index + 1}/${chunks.size} failed after retries: $reason")
             }
         }
         imageChunkAcks[ackKey] = {
@@ -106,11 +113,11 @@ class WearableBridge(context: Context) {
                 handler.postDelayed({ sendImagePart(nodeId, transferId, chunks, index + 1, imageIndex, images, status) }, 80)
             }
         }
-        handler.postAtTime({ failChunk("watch acknowledgement timeout") }, ackKey, android.os.SystemClock.uptimeMillis() + 8000)
+        handler.postAtTime({ retryChunk("watch acknowledgement timeout") }, ackKey, android.os.SystemClock.uptimeMillis() + 8000)
         sendPayload(nodeId, payload, {}, { error ->
             // A successful transport send is not proof that the watch processed the chunk.
             // Wait for the watch acknowledgement; report transport errors immediately.
-            failChunk(error)
+            retryChunk(error)
         })
     }
 
