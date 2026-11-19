@@ -15,10 +15,10 @@
     <text class="url">{{pageUrl}}</text>
     <div if="{{!keyboardVisible}}" class="readerArea">
       <scroll class="reader" scroll-y="true" scroll-x="false">
-        <text class="body">{{pageText}}</text>
         <div class="imageList" if="{{pageImages.length > 0}}">
           <image for="{{item in pageImages}}" src="{{item.uri}}" class="pageImage" @complete="onImageComplete" @error="onImageError" />
         </div>
+        <text class="body" if="{{!visualPage}}">{{pageText}}</text>
         <div class="linkList">
           <text class="link" for="{{item in pageLinks}}" @click="openLink(item)">{{item.title}}</text>
         </div>
@@ -59,6 +59,7 @@ export default {
     status: 'Подключаемся к телефону…',
     pageTitle: 'Открой сайт в приложении на телефоне',
     pageUrl: '',
+    visualPage: false,
     pageText: 'Unicode-тест: Привет, мир! Ёё Жж Яя. Числа: 12345. Знаки: № ₽ © → • — … Эмодзи: 😀 🚀',
     pageLinks: [],
     pageImages: [],
@@ -117,6 +118,7 @@ export default {
       this.chunks = []
       this.received = 0
       this.pageText = ''
+      this.visualPage = false
       this.pageLinks = []
       this.pageImages.forEach((item) => {
         file.delete({uri: item.uri, success: () => {}, fail: () => {}})
@@ -134,7 +136,9 @@ export default {
       const marker = '\n\n__WRIST_LINKS__\n'
       const markerIndex = content.indexOf(marker)
       if (markerIndex >= 0) {
-        this.pageText = content.slice(0, markerIndex)
+        const pageContent = content.slice(0, markerIndex)
+        this.visualPage = pageContent.indexOf('__WRIST_VISUAL_PAGE__') === 0
+        this.pageText = this.visualPage ? '' : pageContent
         try {
           this.pageLinks = JSON.parse(content.slice(markerIndex + marker.length)) || []
         } catch (error) {
@@ -142,6 +146,7 @@ export default {
         }
       } else {
         this.pageText = content
+        this.visualPage = false
         this.pageLinks = []
       }
       this.status = 'Страница загружена'
@@ -315,7 +320,7 @@ export default {
 .reader { width: 420px; height: 285px; }
 .body { width: 410px; color: #e2e8ed; font-size: 17px; }
 .imageList { width: 410px; flex-direction: column; align-items: center; margin-top: 8px; margin-bottom: 8px; }
-.pageImage { width: 380px; height: 210px; object-fit: contain; margin-bottom: 8px; }
+.pageImage { width: 380px; height: 236px; object-fit: contain; margin-bottom: 8px; }
 .linkList { width: 410px; flex-direction: column; margin-top: 8px; }
 .link { width: 405px; color: #8ed6c5; font-size: 15px; padding: 8px 4px; border-bottom: 1px solid #344653; }
 .hint { width: 420px; color: #8797a3; font-size: 10px; text-align: center; margin-top: 5px; }
