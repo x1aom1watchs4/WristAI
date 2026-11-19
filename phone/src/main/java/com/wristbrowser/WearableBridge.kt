@@ -12,12 +12,14 @@ import org.json.JSONObject
 import java.nio.charset.StandardCharsets
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.ConcurrentHashMap
 
 class WearableBridge(context: Context) {
     private val app = context.applicationContext
     @Volatile private var node: Node? = null
     @Volatile private var commandListener: ((String) -> Unit)? = null
     @Volatile private var listeningNodeId: String? = null
+    private val imageChunkAcks = ConcurrentHashMap<String, () -> Unit>()
 
     fun setCommandListener(listener: ((String) -> Unit)?) {
         commandListener = listener
@@ -45,6 +47,10 @@ class WearableBridge(context: Context) {
                 transferPage(found, page, images, status)
             }
         }
+    }
+
+    fun acknowledgeImageChunk(transferId: String, index: Int) {
+        imageChunkAcks.remove("$transferId:$index")?.invoke()
     }
 
     private fun transferImages(nodeId: String, images: List<PageImage>, imageIndex: Int, status: (String) -> Unit) {
@@ -84,10 +90,28 @@ class WearableBridge(context: Context) {
         }
         val payload = JSONObject().put("protocol", 1).put("type", "browser_image_chunk")
             .put("id", transferId).put("index", index).put("data", chunks[index]).toString()
-        sendPayload(nodeId, payload, {
-            status("Image ${imageIndex + 1}/${images.size}: ${index + 1}/${chunks.size}")
-            Handler(Looper.getMainLooper()).postDelayed({ sendImagePart(nodeId, transferId, chunks, index + 1, imageIndex, images, status) }, 100)
-        }, { status("Image chunk error ${index + 1}: $it") })
+        val ackKey = "$transferId:$index"
+        val handler = Handler(Looper.getMainLooper())
+        val completed = AtomicBoolean(false)
+        fun failChunk(reason: String) {
+            if (completed.compareAndSet(false, true)) {
+                imageChunkAcks.remove(ackKey)
+                status("Image chunk ${index + 1}/${chunks.size} was not acknowledged: $reason")
+            }
+        }
+        imageChunkAcks[ackKey] = {
+            if (completed.compareAndSet(false, true)) {
+                handler.removeCallbacksAndMessages(ackKey)
+                status("Image ${imageIndex + 1}/${images.size}: ${index + 1}/${chunks.size}")
+                handler.postDelayed({ sendImagePart(nodeId, transferId, chunks, index + 1, imageIndex, images, status) }, 80)
+            }
+        }
+        handler.postAtTime({ failChunk("watch acknowledgement timeout") }, ackKey, android.os.SystemClock.uptimeMillis() + 8000)
+        sendPayload(nodeId, payload, {}, { error ->
+            // A successful transport send is not proof that the watch processed the chunk.
+            // Wait for the watch acknowledgement; report transport errors immediately.
+            failChunk(error)
+        })
     }
 
     private fun registerCommandListener(target: Node) {
@@ -97,7 +121,15 @@ class WearableBridge(context: Context) {
                 target.id,
                 OnMessageReceivedListener { _, data ->
                     val message = try { String(data, StandardCharsets.UTF_8) } catch (_: Exception) { "" }
-                    if (message.isNotBlank()) commandListener?.invoke(message)
+                    if (message.isNotBlank()) {
+                        try {
+                            val json = JSONObject(message)
+                            if (json.optString("type") == "browser_image_chunk_ack") {
+                                acknowledgeImageChunk(json.optString("id"), json.optInt("index", -1))
+                            }
+                        } catch (_: Exception) {}
+                        commandListener?.invoke(message)
+                    }
                 }
             )
             listeningNodeId = target.id
