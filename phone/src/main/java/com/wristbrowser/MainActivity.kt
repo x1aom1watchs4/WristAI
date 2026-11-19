@@ -155,14 +155,16 @@ class MainActivity : ComponentActivity() {
                 status = "Preparing text and images for watch..."
                 val script = """(function(){
                     var links=[], linkSeen={};
-                    var clickable=Array.from(document.querySelectorAll('a[href],button,[role="link"],[role="button"],[onclick],[data-href],[data-url],input[type="button"],input[type="submit"]')).slice(0,120);
+                    var clickable=Array.from(document.querySelectorAll('a[href],button,[role="link"],[role="button"],[onclick],[data-href],[data-url],input[type="button"],input[type="submit"],input:not([type="button"]):not([type="submit"]):not([type="checkbox"]):not([type="radio"]),textarea,[contenteditable="true"]')).slice(0,120);
                     clickable.forEach(function(e,n){
-                        var title=String(e.innerText||e.getAttribute('aria-label')||e.value||e.title||'').trim().replace(/\s+/g,' ').slice(0,90);
+                        var isInput=e.matches('input:not([type="button"]):not([type="submit"]):not([type="checkbox"]):not([type="radio"]),textarea,[contenteditable="true"]');
+                        var title=String(e.innerText||e.getAttribute('aria-label')||e.placeholder||e.value||e.title||e.name||(isInput?'Поле ввода':'')).trim().replace(/\s+/g,' ').slice(0,90);
+                        if(!title&&isInput)title='Поле ввода';
                         if(!title)return;
                         var raw=e.href||e.getAttribute('href')||e.getAttribute('data-href')||e.getAttribute('data-url')||'';
                         var url='';
                         if(raw){try{var resolved=new URL(raw,location.href).href;if(resolved.indexOf('https://')===0)url=resolved;}catch(ignore){}}
-                        var actionId='wrist-'+n;
+                        var actionId=(isInput?'wrist-input-':'wrist-')+n;
                         e.setAttribute('data-wrist-action',actionId);
                         var key=url||actionId;
                         if(!linkSeen[key]){linkSeen[key]=true;links.push({title:title,url:url,actionId:actionId});}
@@ -319,10 +321,10 @@ class MainActivity : ComponentActivity() {
                                 "click_element" -> {
                                     val actionId = command.optString("actionId")
                                     val view = browserView
-                                    if (actionId.matches(Regex("^wrist-[0-9]{1,3}$")) && view != null && pageReady && !pageLoading) {
+                                    if (actionId.matches(Regex("^wrist-(input-)?[0-9]{1,3}$")) && view != null && pageReady && !pageLoading) {
                                         val actionLiteral = JSONObject.quote(actionId)
                                         sendAfterLoad = true
-                                        val script = "(function(){var a=document.querySelectorAll('[data-wrist-action]');for(var i=0;i<a.length;i++){if(a[i].getAttribute('data-wrist-action')===$actionLiteral){a[i].click();return 'clicked';}}return 'not-found';})()"
+                                        val script = "(function(){var a=document.querySelectorAll('[data-wrist-action]');for(var i=0;i<a.length;i++){if(a[i].getAttribute('data-wrist-action')===$actionLiteral){var e=a[i];if(e.matches('input:not([type=button]):not([type=submit]),textarea,[contenteditable=true]')){e.focus();return 'input';}e.click();return 'clicked';}}return 'not-found';})()"
                                         view.evaluateJavascript(script) { result ->
                                             if (result == "\"not-found\"") {
                                                 sendAfterLoad = false
@@ -370,6 +372,17 @@ class MainActivity : ComponentActivity() {
                                     if (query.isNotBlank()) {
                                         address = query
                                         openBrowserUrl(query, true)
+                                    }
+                                }
+                                "type_text" -> {
+                                    val textLiteral = JSONObject.quote(command.optString("text").take(500))
+                                    val view = browserView
+                                    if (view != null && pageReady && !pageLoading) {
+                                        val script = "(function(){var e=document.activeElement;if(!e)return 'no-focus';if(e.isContentEditable){document.execCommand('insertText',false,$textLiteral);}else if(e.matches('input,textarea')){var p=e.tagName==='TEXTAREA'?HTMLTextAreaElement.prototype:HTMLInputElement.prototype;var d=Object.getOwnPropertyDescriptor(p,'value');if(d&&d.set)d.set.call(e,(e.value||'')+$textLiteral);else e.value=(e.value||'')+$textLiteral;e.dispatchEvent(new Event('input',{bubbles:true}));e.dispatchEvent(new Event('change',{bubbles:true}));}else{return 'not-editable';}return 'typed';})()"
+                                        view.evaluateJavascript(script) {
+                                            status = "Текст отправлен в поле."
+                                            mainHandler.postDelayed({ if (pageReady && !pageLoading) captureAndSend(view) }, 500)
+                                        }
                                     }
                                 }
                                 "tap" -> {
