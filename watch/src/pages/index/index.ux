@@ -3,7 +3,14 @@
     <text class="brand">WristAI</text>
     <text class="status">{{status}}</text>
     <scroll class="chat" if="{{!keyboardVisible}}" scroll-y="true" scroll-x="false">
-      <text class="conversation">{{conversation}}</text>
+      <div class="conversation">
+        <div class="conversationLine" for="{{line in conversationLines}}">
+          <div class="conversationGlyph" for="{{item in line}}">
+            <image if="{{item.image}}" class="conversationImage" src="{{item.image}}" />
+            <text if="{{!item.image}}" class="conversationPlain">{{item.char}}</text>
+          </div>
+        </div>
+      </div>
     </scroll>
     <div class="composer" @click="showKeyboard"><text class="prompt">{{query || 'Нажми, чтобы задать вопрос ИИ'}}</text></div>
     <div class="actions" if="{{!keyboardVisible}}">
@@ -36,6 +43,7 @@ export default {
   private: {
     status: 'Подключаемся к телефону…',
     conversation: 'WristAI готов. Введи вопрос — телефон отправит его в Gemini и вернёт ответ сюда.',
+    conversationLines: [],
     query: '', queryGlyphs: [], keyboardVisible: true, keyboardLanguage: 'ru',
     transferId: '', expectedChunks: 0, chunks: [], received: 0,
     ruRow1: ['Й','Ц','У','К','Е','Н','Г','Ш','Щ','З','Х'],
@@ -45,7 +53,7 @@ export default {
     row2: ['A','S','D','F','G','H','J','K','L'],
     row3: ['Z','X','C','V','B','N','M']
   },
-  onInit() { this.updateQueryGlyphs(); this.bindConnection() },
+  onInit() { this.updateQueryGlyphs(); this.updateConversationLines(); this.bindConnection() },
   bindConnection() {
     connection = interconnect.instance()
     connection.onopen = () => { this.status = 'Телефон подключён' }
@@ -78,7 +86,10 @@ export default {
     } else if (message.type === 'page_end') {
       if (message.id !== this.transferId) return
       const answer = this.chunks.join('').trim()
-      if (answer) this.conversation = this.conversation + '\n\nИИ:\n' + answer
+      if (answer) {
+        this.conversation = this.conversation + '\n\nИИ:\n' + answer
+        this.updateConversationLines()
+      }
       this.status = answer ? 'Ответ получен' : 'ИИ вернул пустой ответ'
       this.chunks = []
       this.sendCommand('page_ack', {id: this.transferId, ok: true})
@@ -124,6 +135,23 @@ export default {
     return output
   },
   updateQueryGlyphs() { this.queryGlyphs = this.makeGlyphs(this.query) },
+  makeConversationLines(value) {
+    const result = []
+    const paragraphs = String(value || '').replace(/\r/g, '').split('\n')
+    paragraphs.forEach((paragraph) => {
+      let rest = paragraph
+      if (!rest) { result.push([]); return }
+      while (rest.length > 26) {
+        let cut = rest.lastIndexOf(' ', 26)
+        if (cut < 12) cut = 26
+        result.push(this.makeGlyphs(rest.slice(0, cut)))
+        rest = rest.slice(cut).replace(/^\s+/, '')
+      }
+      result.push(this.makeGlyphs(rest))
+    })
+    return result
+  },
+  updateConversationLines() { this.conversationLines = this.makeConversationLines(this.conversation) },
   showKeyboard() { this.keyboardVisible = true },
   hideKeyboard() { this.keyboardVisible = false },
   appendKey(key) { this.query = String(this.query || '') + String(key || ''); this.updateQueryGlyphs() },
@@ -135,6 +163,7 @@ export default {
     if (!prompt) return
     if (prompt.length > 4000) { this.status = 'Вопрос слишком длинный (максимум 4000 символов)'; return }
     this.conversation = this.conversation + '\n\nТы:\n' + prompt
+    this.updateConversationLines()
     this.query = ''
     this.keyboardVisible = false
     this.status = 'Отправляем вопрос на телефон…'
@@ -147,7 +176,11 @@ export default {
 .brand { color:#ffffff; font-size:28px; font-weight:bold; margin-bottom:2px; }
 .status { color:#9eb2c4; font-size:14px; height:22px; }
 .chat { width:100%; height:230px; margin-top:8px; margin-bottom:8px; background-color:#182633; border-radius:14px; padding:12px; box-sizing:border-box; }
-.conversation { color:#f1f5f9; font-size:19px; line-height:1.35; }
+.conversation { width:100%; flex-direction:column; align-items:flex-start; }
+.conversationLine { width:100%; min-height:22px; flex-direction:row; align-items:center; }
+.conversationGlyph { width:14px; height:22px; flex-direction:row; align-items:center; justify-content:center; flex-shrink:0; }
+.conversationImage { width:14px; height:18px; }
+.conversationPlain { color:#f1f5f9; font-size:15px; text-align:center; }
 .composer { width:100%; min-height:42px; background-color:#263746; border-radius:12px; padding:10px; box-sizing:border-box; }
 .prompt { color:#ffffff; font-size:17px; }
 .actions { width:100%; flex-direction:row; justify-content:space-between; margin-top:7px; }
@@ -158,14 +191,14 @@ export default {
 .typedGlyph { flex-direction:row; align-items:center; }
 .typedImage { width:18px; height:22px; }
 .typedPlain,.typedCursor { color:#ffffff; font-size:18px; }
-.keyRow { width:100%; height:48px; flex-direction:row; justify-content:center; align-items:center; flex-shrink:0; margin-bottom:3px; }
+.keyRow { width:100%; height:52px; flex-direction:row; justify-content:center; align-items:center; flex-shrink:0; margin-bottom:3px; }
 .ruFirst { padding-left:0px; padding-right:0px; }
-.ruSecond { padding-left:4px; padding-right:4px; }
-.ruThird { padding-left:14px; padding-right:14px; }
-.ruFourth { height:40px; }
-.key { width:33px; height:44px; color:#ffffff; background-color:#34495b; font-size:19px; padding:0px; margin:1px; border-radius:8px; align-items:center; justify-content:center; text-align:center; flex-shrink:0; }
-.imageKey { width:33px; height:44px; padding:0px; }
-.glyph { width:27px; height:30px; }
+.ruSecond { padding-left:0px; padding-right:0px; }
+.ruThird { padding-left:0px; padding-right:0px; }
+.ruFourth { height:48px; }
+.key { width:36px; height:50px; color:#ffffff; background-color:#34495b; font-size:22px; padding:0px; margin:1px; border-radius:9px; align-items:center; justify-content:center; text-align:center; flex-shrink:0; }
+.imageKey { width:36px; height:50px; padding:0px; }
+.glyph { width:32px; height:36px; }
 .special { width:48px; background-color:#476176; }
 .spaceKey { width:145px; }
 </style>
