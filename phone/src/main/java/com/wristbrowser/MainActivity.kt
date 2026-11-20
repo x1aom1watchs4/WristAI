@@ -7,6 +7,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -18,6 +19,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -112,6 +115,17 @@ class MainActivity : ComponentActivity() {
             var apiKey by remember {
                 mutableStateOf(encryptedPrefs?.getString("openrouter_api_key", "") ?: "")
             }
+            val chatModels = listOf(
+                "google/gemma-4-26b-a4b-it:free" to "Gemma 4 26B A4B (Free)",
+                "qwen/qwen4-max" to "Qwen4 Max",
+                "mistralai/pixtral-large-2502" to "Pixtral Large 2502",
+                "openai/gpt-6.2-astra-pro" to "GPT-6.2 Astra Pro"
+            )
+            var selectedModelId by remember {
+                mutableStateOf(encryptedPrefs?.getString("openrouter_model_id", chatModels.first().first) ?: chatModels.first().first)
+            }
+            var modelMenuExpanded by remember { mutableStateOf(false) }
+            val selectedModelName = chatModels.firstOrNull { it.first == selectedModelId }?.second ?: chatModels.first().second
             var status by remember { mutableStateOf("Подключаемся к часам…") }
             var busy by remember { mutableStateOf(false) }
             var history by remember { mutableStateOf(listOf<Pair<String, String>>()) }
@@ -132,7 +146,8 @@ class MainActivity : ComponentActivity() {
                                 busy -> status = "ИИ уже готовит ответ. Подожди завершения."
                                 else -> {
                                     busy = true
-                                    status = "Gemma 4 26B A4B обрабатывает вопрос…"
+                                    val modelName = chatModels.firstOrNull { it.first == selectedModelId }?.second ?: selectedModelId
+                                    status = "$modelName обрабатывает вопрос…"
                                     val messages = JSONArray()
                                     history.forEach { turn ->
                                         messages.put(JSONObject()
@@ -141,13 +156,13 @@ class MainActivity : ComponentActivity() {
                                     }
                                     messages.put(JSONObject().put("role", "user").put("content", prompt))
                                     val requestBody = JSONObject()
-                                        .put("model", "google/gemma-4-26b-a4b-it:free")
+                                        .put("model", selectedModelId)
                                         .put("messages", messages)
                                         .put("max_tokens", 600)
                                     requestOpenRouter(apiKey.trim(), requestBody) { answer, error ->
                                         busy = false
                                         if (answer == null) {
-                                            val message = "Ошибка OpenRouter / Gemma 4 26B A4B: " + (error ?: "неизвестная ошибка")
+                                            val message = "Ошибка OpenRouter / $modelName: " + (error ?: "неизвестная ошибка")
                                             status = message
                                             bridge.send(WebPage("wristai://reply", "WristAI", message), emptyList()) { result -> status = result }
                                         } else {
@@ -173,7 +188,27 @@ class MainActivity : ComponentActivity() {
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         Text("WristAI", fontSize = 30.sp, style = MaterialTheme.typography.headlineMedium)
-                        Text("Телефон обрабатывает вопросы через Gemma 4 26B A4B (OpenRouter). Часы показывают облегчённую текстовую переписку.")
+                        Text("Телефон отправляет вопросы выбранной модели OpenRouter. Часы показывают облегчённую текстовую переписку.")
+                        Text("Модель для ответов", style = MaterialTheme.typography.titleMedium)
+                        Box {
+                            OutlinedButton(onClick = { modelMenuExpanded = true }, modifier = Modifier.fillMaxWidth()) {
+                                Text(selectedModelName)
+                            }
+                            DropdownMenu(expanded = modelMenuExpanded, onDismissRequest = { modelMenuExpanded = false }) {
+                                chatModels.forEach { model ->
+                                    DropdownMenuItem(
+                                        text = { Text(model.second) },
+                                        onClick = {
+                                            selectedModelId = model.first
+                                            encryptedPrefs?.edit()?.putString("openrouter_model_id", model.first)?.apply()
+                                            modelMenuExpanded = false
+                                            status = "Выбрана модель: ${model.second}"
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                        Text("Seedance 2.5 Flash — отдельная модель генерации видео, она не используется для текстовых ответов.", style = MaterialTheme.typography.bodySmall)
                         OutlinedTextField(
                             value = apiKey, onValueChange = {
                                 apiKey = it
