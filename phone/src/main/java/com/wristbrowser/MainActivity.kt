@@ -107,7 +107,7 @@ class MainActivity : ComponentActivity() {
             if (width < 2 || height < 2) return null
             source = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
             view.draw(Canvas(source))
-            val scale = minOf(320f / width, 200f / height, 1f)
+            val scale = minOf(260f / width, 160f / height, 1f)
             val targetWidth = maxOf(1, (width * scale).toInt())
             val targetHeight = maxOf(1, (height * scale).toInt())
             scaled = if (targetWidth != width || targetHeight != height) {
@@ -119,13 +119,13 @@ class MainActivity : ComponentActivity() {
                 drawBitmap(scaled, 0f, 0f, null)
             }
             val output = ByteArrayOutputStream()
-            var quality = 76
+            var quality = 62
             do {
                 output.reset()
                 rgb.compress(Bitmap.CompressFormat.JPEG, quality, output)
-                quality -= 8
-            } while (output.size() > 78 * 1024 && quality >= 40)
-            return output.toByteArray().takeIf { it.size <= 80 * 1024 }
+                quality -= 6
+            } while (output.size() > 22 * 1024 && quality >= 38)
+            return output.toByteArray().takeIf { it.size <= 24 * 1024 }
         } catch (_: Exception) {
             return null
         } finally {
@@ -148,6 +148,7 @@ class MainActivity : ComponentActivity() {
             var sendAfterLoad by remember { mutableStateOf(false) }
             var sendingImage by remember { mutableStateOf(false) }
             var capturePending by remember { mutableStateOf(false) }
+            var loadTimeoutTask by remember { mutableStateOf<Runnable?>(null) }
 
             fun captureAndSend(view: WebView) {
                 if (sendingImage) { capturePending = true; return }
@@ -169,49 +170,12 @@ class MainActivity : ComponentActivity() {
                         var key=url||actionId;
                         if(!linkSeen[key]){linkSeen[key]=true;links.push({title:title,url:url,actionId:actionId});}
                     });
-                    var imageNodes=Array.from(document.querySelectorAll('img,picture source,[style],[class]')).slice(0,900);
-                    var images=[], seen={};
-                    function addCandidate(raw,title){
-                        if(!raw)return;
-                        raw=String(raw).trim();
-                        if(raw.indexOf(',')>=0){
-                            var choices=raw.split(',').map(function(part){
-                                var bits=part.trim().split(/\s+/);var score=0;
-                                if(bits.length>1){var v=parseFloat(bits[1]);if(!isNaN(v))score=v*(bits[1].indexOf('x')>=0?1000:1);}
-                                return {url:bits[0],score:score};
-                            }).sort(function(a,b){return b.score-a.score;});
-                            raw=choices.length?choices[0].url:'';
-                        } else raw=raw.split(/\s+/)[0];
-                        if(!raw||raw.indexOf('data:')===0||raw.indexOf('blob:')===0)return;
-                        try{
-                            var u=new URL(raw,location.href).href;
-                            if(u.indexOf('https://')!==0||seen[u])return;
-                            seen[u]=true;images.push({url:u,title:title||'Изображение'});
-                        }catch(ignore){}
-                    }
-                    imageNodes.forEach(function(e){
-                        if(images.length>=5)return;
-                        var title=e.alt||e.title||e.getAttribute('aria-label')||'Изображение';
-                        var candidates=[];
-                        if(e.tagName==='IMG'||e.tagName==='SOURCE'){
-                            candidates=[e.getAttribute('data-src'),e.getAttribute('data-original'),e.getAttribute('data-lazy-src'),e.getAttribute('data-url'),e.getAttribute('data-srcset'),e.getAttribute('srcset'),e.currentSrc,e.getAttribute('src')];
-                            if(e.tagName==='IMG'&&e.loading==='lazy')e.loading='eager';
-                        }
-                        candidates.forEach(function(c){if(images.length<5)addCandidate(c,title);});
-                        if(images.length<5){
-                            try{
-                                var bg=getComputedStyle(e).backgroundImage||'';
-                                var matches=bg.matchAll(/url\((['"]?)(.*?)\1\)/g);
-                                for(var m of matches){addCandidate(m[2],title);if(images.length>=5)break;}
-                            }catch(ignore){}
-                        }
-                    });
                     return JSON.stringify({
                         title:document.title||location.hostname,
                         url:location.href,
                         text:(document.body&&document.body.innerText||'').slice(0,54000),
                         links:links.slice(0,80),
-                        images:images.slice(0,5)
+                        images:[]
                     });
                 })()"""
                 view.evaluateJavascript(script) { result ->
@@ -228,51 +192,32 @@ class MainActivity : ComponentActivity() {
                                 (pageData.optJSONArray("links")?.toString() ?: "[]")
                         )
                         if (page.text.isBlank()) throw IllegalStateException("No page content found")
-                        val imageCandidates = mutableListOf<Pair<String, String>>()
-                        val imageArray = pageData.optJSONArray("images")
-                        if (imageArray != null) {
-                            for (i in 0 until minOf(imageArray.length(), 5)) {
-                                val item = imageArray.optJSONObject(i) ?: continue
-                                val imageUrl = item.optString("url", "")
-                                if (imageUrl.startsWith("https://")) {
-                                    imageCandidates += (item.optString("title", "Изображение") to imageUrl)
-                                }
-                            }
+                        val pageImages = if (snapshot != null) {
+                            listOf(PageImage("Снимок страницы", snapshot))
+                        } else {
+                            emptyList()
                         }
-                        Thread {
-                            val pageImages = mutableListOf<PageImage>()
-                            if (snapshot != null) pageImages.add(0, PageImage("Снимок страницы", snapshot))
-                            imageCandidates.take(if (snapshot != null) 4 else 5).forEach { (title, imageUrl) ->
-                                downloadAndCompressImage(imageUrl, page.url)?.let { pageImages.add(PageImage(title, it)) }
-                            }
+                        status = if (snapshot != null) {
+                            "Отправляем уменьшенный снимок страницы…"
+                        } else {
+                            "Отправляем текст и ссылки…"
+                        }
+                        bridge.send(page, pageImages) { message ->
                             runOnUiThread {
-                                status = if (snapshot != null) {
-                                    "Sending visual page and links: ${pageImages.size} image(s)..."
-                                } else if (imageCandidates.isEmpty()) {
-                                    "Screenshot unavailable; sending readable text and links."
-                                } else if (pageImages.isEmpty()) {
-                                    "Screenshot unavailable; page images could not be downloaded. Sending text."
-                                } else {
-                                    "Sending page with ${pageImages.size} image(s)..."
-                                }
-                                bridge.send(page, pageImages) { message ->
-                                    runOnUiThread {
-                                        status = message
-                                        val finished = message.startsWith("All page data") ||
-                                            message.contains("error", ignoreCase = true) ||
-                                            message.contains("Could not", ignoreCase = true) ||
-                                            message.contains("not connected", ignoreCase = true)
-                                        if (finished) {
-                                            sendingImage = false
-                                            if (capturePending) {
-                                                capturePending = false
-                                                browserView?.let { captureAndSend(it) }
-                                            }
-                                        }
+                                status = message
+                                val finished = message.startsWith("All page data") ||
+                                    message.contains("error", ignoreCase = true) ||
+                                    message.contains("Could not", ignoreCase = true) ||
+                                    message.contains("not connected", ignoreCase = true)
+                                if (finished) {
+                                    sendingImage = false
+                                    if (capturePending) {
+                                        capturePending = false
+                                        browserView?.let { captureAndSend(it) }
                                     }
                                 }
                             }
-                        }.start()
+                        }
                     } catch (error: Exception) {
                         sendingImage = false
                         status = "Could not prepare page: ${error.message ?: "unknown error"}"
@@ -628,12 +573,24 @@ class MainActivity : ComponentActivity() {
                                                     url: String,
                                                     favicon: Bitmap?
                                                 ) {
+                                                    loadTimeoutTask?.let { mainHandler.removeCallbacks(it) }
                                                     pageLoading = true
                                                     pageReady = false
                                                     status = "Loading page..."
+                                                    val timeoutTask = Runnable {
+                                                        if (pageLoading && sendAfterLoad) {
+                                                            sendAfterLoad = false
+                                                            status = "Сайт долго отвечает — отправляю уже загруженную часть. Загрузка продолжается."
+                                                            captureAndSend(view)
+                                                        }
+                                                    }
+                                                    loadTimeoutTask = timeoutTask
+                                                    mainHandler.postDelayed(timeoutTask, 7000)
                                                 }
 
                                                 override fun onPageFinished(view: WebView, url: String) {
+                                                    loadTimeoutTask?.let { mainHandler.removeCallbacks(it) }
+                                                    loadTimeoutTask = null
                                                     pageLoading = false
                                                     pageReady = true
                                                     if (sendAfterLoad) {
