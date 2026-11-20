@@ -137,12 +137,56 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+
+    private fun requestGemini(apiKey: String, requestBody: JSONObject, callback: (String?, String?) -> Unit) {
+        Thread {
+            var connection: HttpURLConnection? = null
+            try {
+                val endpoint = URL("https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=" + Uri.encode(apiKey))
+                connection = (endpoint.openConnection() as HttpURLConnection).apply {
+                    requestMethod = "POST"
+                    connectTimeout = 15000
+                    readTimeout = 60000
+                    doOutput = true
+                    setRequestProperty("Content-Type", "application/json; charset=utf-8")
+                    setRequestProperty("Accept", "application/json")
+                }
+                connection.outputStream.use { it.write(requestBody.toString().toByteArray(Charsets.UTF_8)) }
+                val code = connection.responseCode
+                val responseText = (if (code in 200..299) connection.inputStream else connection.errorStream)
+                    ?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty()
+                if (code !in 200..299) {
+                    val detail = try { JSONObject(responseText).optJSONObject("error")?.optString("message") } catch (_: Exception) { null }
+                    throw IllegalStateException(detail?.takeIf { it.isNotBlank() } ?: "Gemini API HTTP $code")
+                }
+                val json = JSONObject(responseText)
+                val candidates = json.optJSONArray("candidates")
+                val parts = candidates?.optJSONObject(0)?.optJSONObject("content")?.optJSONArray("parts")
+                val answer = buildString {
+                    if (parts != null) for (i in 0 until parts.length()) {
+                        val part = parts.optJSONObject(i)
+                        if (part != null) append(part.optString("text", ""))
+                    }
+                }.trim()
+                if (answer.isBlank()) throw IllegalStateException("Gemini вернул пустой ответ")
+                mainHandler.post { callback(answer, null) }
+            } catch (error: Exception) {
+                mainHandler.post { callback(null, error.message ?: "Не удалось связаться с Gemini") }
+            } finally {
+                connection?.disconnect()
+            }
+        }.start()
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
             val bridge = remember { WearableBridge(applicationContext) }
             var address by remember { mutableStateOf("https://example.com") }
             var status by remember { mutableStateOf("Connecting to watch...") }
+            var geminiApiKey by remember { mutableStateOf("") }
+            var aiBusy by remember { mutableStateOf(false) }
+            var aiHistory by remember { mutableStateOf(listOf<Pair<String, String>>()) }
             var browserView by remember { mutableStateOf<WebView?>(null) }
             var pageLoading by remember { mutableStateOf(false) }
             var pageReady by remember { mutableStateOf(false) }
@@ -256,6 +300,46 @@ class MainActivity : ComponentActivity() {
                         try {
                             val command = JSONObject(raw)
                             when (command.optString("type")) {
+                                "ai_prompt" -> {
+                                    val prompt = command.optString("prompt").trim().take(4000)
+                                    when {
+                                        prompt.isBlank() -> status = "Пустой вопрос для Gemini."
+                                        geminiApiKey.isBlank() -> status = "Сначала введи Gemini API key в приложении на телефоне."
+                                        aiBusy -> status = "Gemini уже готовит ответ. Подожди немного."
+                                        else -> {
+                                            aiBusy = true
+                                            status = "Gemini 3.8 Flash думает…"
+                                            val contents = org.json.JSONArray()
+                                            aiHistory.forEach { turn ->
+                                                contents.put(JSONObject()
+                                                    .put("role", turn.first)
+                                                    .put("parts", org.json.JSONArray().put(JSONObject().put("text", turn.second))))
+                                            }
+                                            contents.put(JSONObject()
+                                                .put("role", "user")
+                                                .put("parts", org.json.JSONArray().put(JSONObject().put("text", prompt))))
+                                            val requestBody = JSONObject()
+                                                .put("contents", contents)
+                                                .put("generationConfig", JSONObject().put("maxOutputTokens", 1200))
+                                            requestGemini(geminiApiKey.trim(), requestBody) { answer, error ->
+                                                aiBusy = false
+                                                if (answer == null) {
+                                                    val message = "Ошибка Gemini: " + (error ?: "неизвестная ошибка")
+                                                    status = message
+                                                    bridge.send(WebPage("https://gemini.google.com/", "Gemini 3.8 Flash", message), emptyList()) { transferStatus ->
+                                                        status = transferStatus
+                                                    }
+                                                } else {
+                                                    aiHistory = (aiHistory + listOf("user" to prompt, "model" to answer)).takeLast(12)
+                                                    status = "Ответ Gemini готов. Отправляем на часы…"
+                                                    bridge.send(WebPage("https://gemini.google.com/", "Gemini 3.8 Flash", answer), emptyList()) { transferStatus ->
+                                                        status = transferStatus
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
                                 "browser_image_ack" -> {
                                     if (!sendingImage) {
                                         status = if (command.optBoolean("ok", false)) {
@@ -480,6 +564,20 @@ class MainActivity : ComponentActivity() {
                         Text(
                             "Open a website on the phone and send its readable page content to Xiaomi Watch S4 over the existing WristBook connection.",
                             style = MaterialTheme.typography.bodyMedium
+                        )
+
+                        OutlinedTextField(
+                            value = geminiApiKey,
+                            onValueChange = { geminiApiKey = it },
+                            label = { Text("Gemini API key") },
+                            placeholder = { Text("Вставь ключ Google AI Studio") },
+                            singleLine = true,
+                            visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Text(
+                            "Ключ хранится только в памяти приложения до его закрытия; в GitHub он не записывается.",
+                            style = MaterialTheme.typography.bodySmall
                         )
 
                         OutlinedTextField(
