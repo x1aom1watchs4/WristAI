@@ -109,7 +109,7 @@ class MainActivity : ComponentActivity() {
             view.draw(Canvas(source))
             // Keep the image payload small: the existing watch protocol acknowledges
             // each 300-character chunk, so fewer bytes means noticeably less transfer time.
-            val scale = minOf(220f / width, 136f / height, 1f)
+            val scale = minOf(260f / width, 160f / height, 1f)
             val targetWidth = maxOf(1, (width * scale).toInt())
             val targetHeight = maxOf(1, (height * scale).toInt())
             scaled = if (targetWidth != width || targetHeight != height) {
@@ -121,13 +121,13 @@ class MainActivity : ComponentActivity() {
                 drawBitmap(scaled, 0f, 0f, null)
             }
             val output = ByteArrayOutputStream()
-            var quality = 56
+            var quality = 62
             do {
                 output.reset()
                 rgb.compress(Bitmap.CompressFormat.JPEG, quality, output)
                 quality -= 6
-            } while (output.size() > 12 * 1024 && quality >= 34)
-            return output.toByteArray().takeIf { it.size <= 14 * 1024 }
+            } while (output.size() > 22 * 1024 && quality >= 38)
+            return output.toByteArray().takeIf { it.size <= 24 * 1024 }
         } catch (_: Exception) {
             return null
         } finally {
