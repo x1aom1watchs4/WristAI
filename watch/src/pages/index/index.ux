@@ -381,8 +381,8 @@ export default {
   },
   showKeyboard() { this.typingIntoPage = false; this.keyboardVisible = true },
   hideKeyboard() { this.keyboardVisible = false; this.typingIntoPage = false },
-  appendKey(key) { this.setQuery(String(this.query || '') + String(key || '')) }
-  deleteKey() { this.setQuery(String(this.query || '').slice(0, -1)) }
+  appendKey(key) { this.setQuery(String(this.query || '') + String(key || '')) },
+  deleteKey() { this.setQuery(String(this.query || '').slice(0, -1)) },
   submitSearch() {
     const value = String(this.query || '').trim()
     if (!value) return
