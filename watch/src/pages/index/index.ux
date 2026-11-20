@@ -10,10 +10,10 @@
       <text class="send" @click="submitPrompt">ОТПРАВИТЬ</text>
       <text class="clear" @click="clearInput">ОЧИСТИТЬ</text>
     </div>
-    <div class="keyboard" if="{{keyboardVisible}}">
-      <div class="keyRow" if="{{keyboardLanguage === 'ru'}}"><text class="key" for="{{item in ruRow1}}" @click="appendKey(item)">{{item}}</text></div>
-      <div class="keyRow" if="{{keyboardLanguage === 'ru'}}"><text class="key" for="{{item in ruRow2}}" @click="appendKey(item)">{{item}}</text></div>
-      <div class="keyRow" if="{{keyboardLanguage === 'ru'}}"><text class="key" for="{{item in ruRow3}}" @click="appendKey(item)">{{item}}</text><text class="key special" @click="deleteKey">⌫</text></div>
+    <div class="keyboard" if="{{keyboardVisible}}">\n      <div class="typed"><div class="typedGlyph" for="{{item in queryGlyphs}}"><image if="{{item.image}}" class="typedImage" src="{{item.image}}" /><text if="{{!item.image}}" class="typedPlain">{{item.char}}</text></div><text class="typedCursor">_</text></div>
+      <div class="keyRow" if="{{keyboardLanguage === 'ru'}}"><div class="key imageKey" @click="appendKey('Й')"><image class="glyph" src="/common/keyboard/u0419.png" /></div><div class="key imageKey" @click="appendKey('Ц')"><image class="glyph" src="/common/keyboard/u0426.png" /></div><div class="key imageKey" @click="appendKey('У')"><image class="glyph" src="/common/keyboard/u0423.png" /></div><div class="key imageKey" @click="appendKey('К')"><image class="glyph" src="/common/keyboard/u041A.png" /></div><div class="key imageKey" @click="appendKey('Е')"><image class="glyph" src="/common/keyboard/u0415.png" /></div><div class="key imageKey" @click="appendKey('Н')"><image class="glyph" src="/common/keyboard/u041D.png" /></div><div class="key imageKey" @click="appendKey('Г')"><image class="glyph" src="/common/keyboard/u0413.png" /></div><div class="key imageKey" @click="appendKey('Ш')"><image class="glyph" src="/common/keyboard/u0428.png" /></div><div class="key imageKey" @click="appendKey('Щ')"><image class="glyph" src="/common/keyboard/u0429.png" /></div><div class="key imageKey" @click="appendKey('З')"><image class="glyph" src="/common/keyboard/u0417.png" /></div><div class="key imageKey" @click="appendKey('Х')"><image class="glyph" src="/common/keyboard/u0425.png" /></div></div>
+      <div class="keyRow" if="{{keyboardLanguage === 'ru'}}"><div class="key imageKey" @click="appendKey('Ф')"><image class="glyph" src="/common/keyboard/u0424.png" /></div><div class="key imageKey" @click="appendKey('Ы')"><image class="glyph" src="/common/keyboard/u042B.png" /></div><div class="key imageKey" @click="appendKey('В')"><image class="glyph" src="/common/keyboard/u0412.png" /></div><div class="key imageKey" @click="appendKey('А')"><image class="glyph" src="/common/keyboard/u0410.png" /></div><div class="key imageKey" @click="appendKey('П')"><image class="glyph" src="/common/keyboard/u041F.png" /></div><div class="key imageKey" @click="appendKey('Р')"><image class="glyph" src="/common/keyboard/u0420.png" /></div><div class="key imageKey" @click="appendKey('О')"><image class="glyph" src="/common/keyboard/u041E.png" /></div><div class="key imageKey" @click="appendKey('Л')"><image class="glyph" src="/common/keyboard/u041B.png" /></div><div class="key imageKey" @click="appendKey('Д')"><image class="glyph" src="/common/keyboard/u0414.png" /></div><div class="key imageKey" @click="appendKey('Ж')"><image class="glyph" src="/common/keyboard/u0416.png" /></div><div class="key imageKey" @click="appendKey('Э')"><image class="glyph" src="/common/keyboard/u042D.png" /></div></div>
+      <div class="keyRow" if="{{keyboardLanguage === 'ru'}}"><div class="key imageKey" @click="appendKey('Я')"><image class="glyph" src="/common/keyboard/u042F.png" /></div><div class="key imageKey" @click="appendKey('Ч')"><image class="glyph" src="/common/keyboard/u0427.png" /></div><div class="key imageKey" @click="appendKey('С')"><image class="glyph" src="/common/keyboard/u0421.png" /></div><div class="key imageKey" @click="appendKey('М')"><image class="glyph" src="/common/keyboard/u041C.png" /></div><div class="key imageKey" @click="appendKey('И')"><image class="glyph" src="/common/keyboard/u0418.png" /></div><div class="key imageKey" @click="appendKey('Т')"><image class="glyph" src="/common/keyboard/u0422.png" /></div><div class="key imageKey" @click="appendKey('Ь')"><image class="glyph" src="/common/keyboard/u042C.png" /></div><div class="key imageKey" @click="appendKey('Б')"><image class="glyph" src="/common/keyboard/u0411.png" /></div><div class="key imageKey" @click="appendKey('Ю')"><image class="glyph" src="/common/keyboard/u042E.png" /></div><div class="key imageKey" @click="appendKey('Ё')"><image class="glyph" src="/common/keyboard/u0401.png" /></div><div class="key imageKey" @click="appendKey('Ъ')"><image class="glyph" src="/common/keyboard/u042A.png" /></div><text class="key special" @click="deleteKey">⌫</text></div>
       <div class="keyRow" if="{{keyboardLanguage === 'en'}}"><text class="key" for="{{item in row1}}" @click="appendKey(item)">{{item}}</text></div>
       <div class="keyRow" if="{{keyboardLanguage === 'en'}}"><text class="key" for="{{item in row2}}" @click="appendKey(item)">{{item}}</text></div>
       <div class="keyRow" if="{{keyboardLanguage === 'en'}}"><text class="key" for="{{item in row3}}" @click="appendKey(item)">{{item}}</text><text class="key special" @click="deleteKey">⌫</text></div>
@@ -34,7 +34,7 @@ export default {
   private: {
     status: 'Подключаемся к телефону…',
     conversation: 'WristAI готов. Введи вопрос — телефон отправит его в Gemini и вернёт ответ сюда.',
-    query: '', keyboardVisible: false, keyboardLanguage: 'ru',
+    query: '', queryGlyphs: [], keyboardVisible: true, keyboardLanguage: 'ru',
     transferId: '', expectedChunks: 0, chunks: [], received: 0,
     ruRow1: ['Й','Ц','У','К','Е','Н','Г','Ш','Щ','З','Х'],
     ruRow2: ['Ф','Ы','В','А','П','Р','О','Л','Д','Ж','Э'],
@@ -43,7 +43,7 @@ export default {
     row2: ['A','S','D','F','G','H','J','K','L'],
     row3: ['Z','X','C','V','B','N','M']
   },
-  onInit() { this.bindConnection() },
+  onInit() { this.updateQueryGlyphs(); this.bindConnection() },
   bindConnection() {
     connection = interconnect.instance()
     connection.onopen = () => { this.status = 'Телефон подключён' }
@@ -112,11 +112,11 @@ export default {
       fail: (error, code) => { this.status = 'Не удалось отправить: ' + String(code || '') }
     })
   },
-  showKeyboard() { this.keyboardVisible = true },
+  makeGlyphs(value) {\n    const output = []\n    const text = String(value || '')\n    for (let i = 0; i < text.length; i++) {\n      const ch = text.charAt(i), code = ch.charCodeAt(0)\n      output.push(code >= 0x0400 && code <= 0x04FF ? {char: ch, image: '/common/glyphs/u' + ('0000' + code.toString(16).toUpperCase()).slice(-4) + '.png'} : {char: ch, image: ''})\n    }\n    return output\n  },\n  updateQueryGlyphs() { this.queryGlyphs = this.makeGlyphs(this.query) },\n  showKeyboard() { this.keyboardVisible = true },
   hideKeyboard() { this.keyboardVisible = false },
-  appendKey(key) { this.query = String(this.query || '') + String(key || '') },
-  deleteKey() { this.query = String(this.query || '').slice(0, -1) },
-  clearInput() { this.query = '' },
+  appendKey(key) { this.query = String(this.query || '') + String(key || ''); this.updateQueryGlyphs() },
+  deleteKey() { this.query = String(this.query || '').slice(0, -1); this.updateQueryGlyphs() },
+  clearInput() { this.query = ''; this.updateQueryGlyphs() },
   toggleKeyboardLanguage() { this.keyboardLanguage = this.keyboardLanguage === 'ru' ? 'en' : 'ru' },
   submitPrompt() {
     const prompt = String(this.query || '').trim()
@@ -143,7 +143,7 @@ export default {
 .clear { color:#d7e1e8; font-size:16px; padding:9px 12px; }
 .keyboard { width:100%; margin-top:6px; background-color:#182633; padding:6px; border-radius:12px; }
 .keyRow { width:100%; flex-direction:row; justify-content:center; margin-bottom:4px; }
-.key { color:#ffffff; background-color:#34495b; font-size:17px; padding:7px 8px; margin:2px; border-radius:7px; }
+.key { color:#ffffff; background-color:#34495b; font-size:17px; padding:7px 8px; margin:2px; border-radius:7px; }\n.imageKey { width:32px; height:34px; padding:2px; align-items:center; justify-content:center; }\n.glyph { width:26px; height:26px; }\n.typed { width:100%; min-height:32px; flex-direction:row; align-items:center; padding:3px 6px; }\n.typedGlyph { flex-direction:row; align-items:center; }\n.typedImage { width:18px; height:22px; }\n.typedPlain,.typedCursor { color:#ffffff; font-size:18px; }
 .special { background-color:#476176; }
 .spaceKey { padding-left:28px; padding-right:28px; }
 </style>
