@@ -1,467 +1,149 @@
 <template>
   <div class="page">
-    <text class="brand" if="{{!keyboardVisible}}">WristBrowser</text>
-    <div class="glyphLine status"><div class="glyphCell" for="{{item in statusGlyphs}}"><image if="{{item.image}}" class="uiGlyph" src="{{item.image}}" /><text if="{{!item.image}}" class="plainGlyph">{{item.char}}</text></div></div>
-    <div class="toolbar">
-      <div class="glyphLine address" @click="showKeyboard"><div class="glyphCell" for="{{item in queryGlyphs}}"><image if="{{item.image}}" class="uiGlyph" src="{{item.image}}" /><text if="{{!item.image}}" class="plainGlyph">{{item.char}}</text></div></div>
-      <div class="keyboardButton glyphLine" @click="showKeyboard"><div class="glyphCell" for="{{item in keyboardLabelGlyphs}}"><image if="{{item.image}}" class="uiGlyph" src="{{item.image}}" /><text if="{{!item.image}}" class="plainGlyph">{{item.char}}</text></div></div>
-      <div class="aiButton" @click="toggleAiMode"><text>{{aiMode ? 'AI ✓' : 'AI'}}</text></div>
-      <input type="button" class="go" value="GO" @click="submitSearch" />
+    <text class="brand">WristAI</text>
+    <text class="status">{{status}}</text>
+    <scroll class="chat" scroll-y="true" scroll-x="false">
+      <text class="conversation">{{conversation}}</text>
+    </scroll>
+    <div class="composer" @click="showKeyboard"><text class="prompt">{{query || 'Нажми, чтобы задать вопрос ИИ'}}</text></div>
+    <div class="actions">
+      <text class="send" @click="submitPrompt">ОТПРАВИТЬ</text>
+      <text class="clear" @click="clearInput">ОЧИСТИТЬ</text>
     </div>
-    <div class="controls" if="{{!keyboardVisible}}">
-      <input type="button" class="control" value="BACK" @click="sendCommand('back')" />
-      <div class="control glyphLine" @click="sendCommand('scroll', {delta: -420})"><div class="glyphCell" for="{{item in upGlyphs}}"><image if="{{item.image}}" class="uiGlyph" src="{{item.image}}" /><text if="{{!item.image}}" class="plainGlyph">{{item.char}}</text></div></div>
-      <div class="control glyphLine" @click="sendCommand('scroll', {delta: 420})"><div class="glyphCell" for="{{item in downGlyphs}}"><image if="{{item.image}}" class="uiGlyph" src="{{item.image}}" /><text if="{{!item.image}}" class="plainGlyph">{{item.char}}</text></div></div>
-      <input type="button" class="control" value="NEXT" @click="sendCommand('forward')" />
-    </div>
-    <div class="glyphLine heading" if="{{!keyboardVisible}}"><div class="glyphCell" for="{{item in titleGlyphs}}"><image if="{{item.image}}" class="uiGlyph" src="{{item.image}}" /><text if="{{!item.image}}" class="plainGlyph">{{item.char}}</text></div></div>
-    <div class="glyphLine url" if="{{!keyboardVisible}}"><div class="glyphCell" for="{{item in urlGlyphs}}"><image if="{{item.image}}" class="uiGlyph" src="{{item.image}}" /><text if="{{!item.image}}" class="plainGlyph">{{item.char}}</text></div></div>
-    <div if="{{!keyboardVisible}}" class="readerArea">
-      <scroll class="reader" scroll-y="true" scroll-x="false">
-        <div class="imageList" if="{{pageImages.length > 0}}">
-          <image if="{{visualPage}}" src="{{pageImages[0].uri}}" class="pageImage" @click="tapPage" @complete="onImageComplete" @error="onImageError" />
-          <image for="{{item in pageImages}}" if="{{!visualPage}}" src="{{item.uri}}" class="pageImage" @complete="onImageComplete" @error="onImageError" />
-        </div>
-        <text class="body" if="{{!visualPage}}">{{pageText}}</text>
-        <div class="linkList">
-          <div class="link glyphLine" for="{{item in pageLinks}}" @click="openLink(item)"><div class="glyphCell" for="{{glyph in item.glyphs}}"><image if="{{glyph.image}}" class="uiGlyph" src="{{glyph.image}}" /><text if="{{!glyph.image}}" class="plainGlyph">{{glyph.char}}</text></div></div>
-        </div>
-      </scroll>
-    </div>
-    <div if="{{keyboardVisible}}" class="keyboard">
-      <div class="typed glyphLine"><div class="glyphCell" for="{{item in queryGlyphs}}"><image if="{{item.image}}" class="uiGlyph" src="{{item.image}}" /><text if="{{!item.image}}" class="plainGlyph">{{item.char}}</text></div><text class="plainGlyph">_</text></div>
-      <div class="layoutToggle glyphLine" @click="toggleKeyboardLanguage"><div class="glyphCell" for="{{item in layoutGlyphs}}"><image if="{{item.image}}" class="uiGlyph" src="{{item.image}}" /><text if="{{!item.image}}" class="plainGlyph">{{item.char}}</text></div></div>
-      <div class="keyRow" if="{{keyboardLanguage === 'en'}}">
-        <text class="key" for="{{item in row1}}" @click="appendKey(item)">{{item}}</text>
-      </div>
-      <div class="keyRow" if="{{keyboardLanguage === 'en'}}">
-        <text class="key" for="{{item in row2}}" @click="appendKey(item)">{{item}}</text>
-      </div>
-      <div class="keyRow" if="{{keyboardLanguage === 'en'}}">
-        <text class="key" for="{{item in row3}}" @click="appendKey(item)">{{item}}</text>
-        <text class="key special" @click="deleteKey">⌫</text>
-      </div>
-      <div class="keyRow" if="{{keyboardLanguage === 'ru'}}">
-        <div class="key imageKey" @click="appendKey('Й')"><image class="glyph" src="/common/keyboard/u0419.png" /></div>
-        <div class="key imageKey" @click="appendKey('Ц')"><image class="glyph" src="/common/keyboard/u0426.png" /></div>
-        <div class="key imageKey" @click="appendKey('У')"><image class="glyph" src="/common/keyboard/u0423.png" /></div>
-        <div class="key imageKey" @click="appendKey('К')"><image class="glyph" src="/common/keyboard/u041A.png" /></div>
-        <div class="key imageKey" @click="appendKey('Е')"><image class="glyph" src="/common/keyboard/u0415.png" /></div>
-        <div class="key imageKey" @click="appendKey('Н')"><image class="glyph" src="/common/keyboard/u041D.png" /></div>
-        <div class="key imageKey" @click="appendKey('Г')"><image class="glyph" src="/common/keyboard/u0413.png" /></div>
-        <div class="key imageKey" @click="appendKey('Ш')"><image class="glyph" src="/common/keyboard/u0428.png" /></div>
-        <div class="key imageKey" @click="appendKey('Щ')"><image class="glyph" src="/common/keyboard/u0429.png" /></div>
-        <div class="key imageKey" @click="appendKey('З')"><image class="glyph" src="/common/keyboard/u0417.png" /></div>
-        <div class="key imageKey" @click="appendKey('Х')"><image class="glyph" src="/common/keyboard/u0425.png" /></div>
-      </div>
-      <div class="keyRow" if="{{keyboardLanguage === 'ru'}}">
-        <div class="key imageKey" @click="appendKey('Ф')"><image class="glyph" src="/common/keyboard/u0424.png" /></div>
-        <div class="key imageKey" @click="appendKey('Ы')"><image class="glyph" src="/common/keyboard/u042B.png" /></div>
-        <div class="key imageKey" @click="appendKey('В')"><image class="glyph" src="/common/keyboard/u0412.png" /></div>
-        <div class="key imageKey" @click="appendKey('А')"><image class="glyph" src="/common/keyboard/u0410.png" /></div>
-        <div class="key imageKey" @click="appendKey('П')"><image class="glyph" src="/common/keyboard/u041F.png" /></div>
-        <div class="key imageKey" @click="appendKey('Р')"><image class="glyph" src="/common/keyboard/u0420.png" /></div>
-        <div class="key imageKey" @click="appendKey('О')"><image class="glyph" src="/common/keyboard/u041E.png" /></div>
-        <div class="key imageKey" @click="appendKey('Л')"><image class="glyph" src="/common/keyboard/u041B.png" /></div>
-        <div class="key imageKey" @click="appendKey('Д')"><image class="glyph" src="/common/keyboard/u0414.png" /></div>
-        <div class="key imageKey" @click="appendKey('Ж')"><image class="glyph" src="/common/keyboard/u0416.png" /></div>
-        <div class="key imageKey" @click="appendKey('Э')"><image class="glyph" src="/common/keyboard/u042D.png" /></div>
-      </div>
-      <div class="keyRow" if="{{keyboardLanguage === 'ru'}}">
-        <div class="key imageKey" @click="appendKey('Я')"><image class="glyph" src="/common/keyboard/u042F.png" /></div>
-        <div class="key imageKey" @click="appendKey('Ч')"><image class="glyph" src="/common/keyboard/u0427.png" /></div>
-        <div class="key imageKey" @click="appendKey('С')"><image class="glyph" src="/common/keyboard/u0421.png" /></div>
-        <div class="key imageKey" @click="appendKey('М')"><image class="glyph" src="/common/keyboard/u041C.png" /></div>
-        <div class="key imageKey" @click="appendKey('И')"><image class="glyph" src="/common/keyboard/u0418.png" /></div>
-        <div class="key imageKey" @click="appendKey('Т')"><image class="glyph" src="/common/keyboard/u0422.png" /></div>
-        <div class="key imageKey" @click="appendKey('Ь')"><image class="glyph" src="/common/keyboard/u042C.png" /></div>
-        <div class="key imageKey" @click="appendKey('Б')"><image class="glyph" src="/common/keyboard/u0411.png" /></div>
-        <div class="key imageKey" @click="appendKey('Ю')"><image class="glyph" src="/common/keyboard/u042E.png" /></div>
-        <text class="key special" @click="deleteKey">⌫</text>
-      </div>
+    <div class="keyboard" if="{{keyboardVisible}}">
+      <div class="keyRow" if="{{keyboardLanguage === 'ru'}}"><text class="key" for="{{item in ruRow1}}" @click="appendKey(item)">{{item}}</text></div>
+      <div class="keyRow" if="{{keyboardLanguage === 'ru'}}"><text class="key" for="{{item in ruRow2}}" @click="appendKey(item)">{{item}}</text></div>
+      <div class="keyRow" if="{{keyboardLanguage === 'ru'}}"><text class="key" for="{{item in ruRow3}}" @click="appendKey(item)">{{item}}</text><text class="key special" @click="deleteKey">⌫</text></div>
+      <div class="keyRow" if="{{keyboardLanguage === 'en'}}"><text class="key" for="{{item in row1}}" @click="appendKey(item)">{{item}}</text></div>
+      <div class="keyRow" if="{{keyboardLanguage === 'en'}}"><text class="key" for="{{item in row2}}" @click="appendKey(item)">{{item}}</text></div>
+      <div class="keyRow" if="{{keyboardLanguage === 'en'}}"><text class="key" for="{{item in row3}}" @click="appendKey(item)">{{item}}</text><text class="key special" @click="deleteKey">⌫</text></div>
       <div class="keyRow">
         <text class="key special" @click="appendKey('.')">.</text>
-        <text class="key spaceKey" @click="appendKey(' ')">SPACE</text>
-        <text class="key special" @click="appendKey('/')">/</text>
-        <text class="key goKey" @click="submitSearch">GO</text>
+        <text class="key spaceKey" @click="appendKey(' ')">ПРОБЕЛ</text>
+        <text class="key special" @click="appendKey('?')">?</text>
+        <text class="key special" @click="toggleKeyboardLanguage">{{keyboardLanguage === 'ru' ? 'EN' : 'РУС'}}</text>
       </div>
-      <div class="cancel glyphLine" @click="hideKeyboard"><div class="glyphCell" for="{{item in cancelGlyphs}}"><image if="{{item.image}}" class="uiGlyph" src="{{item.image}}" /><text if="{{!item.image}}" class="plainGlyph">{{item.char}}</text></div></div>
+      <div class="keyRow"><text class="key special" @click="hideKeyboard">ГОТОВО</text><text class="key special" @click="submitPrompt">ОТПРАВИТЬ</text></div>
     </div>
-    <div class="hint glyphLine" if="{{!keyboardVisible}}"><div class="glyphCell" for="{{item in hintGlyphs}}"><image if="{{item.image}}" class="uiGlyph" src="{{item.image}}" /><text if="{{!item.image}}" class="plainGlyph">{{item.char}}</text></div></div>
   </div>
 </template>
-
 <script>
 import interconnect from '@system.interconnect'
-import file from '@system.file'
-
 let connection = null
-
 export default {
   private: {
     status: 'Подключаемся к телефону…',
-    statusGlyphs: [], titleGlyphs: [], urlGlyphs: [], queryGlyphs: [],
-    keyboardLabelGlyphs: [], upGlyphs: [], downGlyphs: [], layoutGlyphs: [], cancelGlyphs: [], hintGlyphs: [],
-    pageTitle: 'Открой сайт в приложении на телефоне',
-    pageUrl: '',
-    visualPage: false,
-    pageText: 'Unicode-тест: Привет, мир! Ёё Жж Яя. Числа: 12345. Знаки: № ₽ © → • — … Эмодзи: 😀 🚀',
-    pageLinks: [],
-    pageImages: [],
-    imageTransferId: '',
-    imageTitle: '',
-    imageExpectedChunks: 0,
-    imageChunks: [],
-    imageReceivedChunks: 0,
-    query: '',
-    aiMode: false,
-    keyboardVisible: false,
-    typingIntoPage: false,
-    keyboardLanguage: 'ru',
+    conversation: 'WristAI готов. Введи вопрос — телефон отправит его в Gemini и вернёт ответ сюда.',
+    query: '', keyboardVisible: false, keyboardLanguage: 'ru',
+    transferId: '', expectedChunks: 0, chunks: [], received: 0,
     ruRow1: ['Й','Ц','У','К','Е','Н','Г','Ш','Щ','З','Х'],
     ruRow2: ['Ф','Ы','В','А','П','Р','О','Л','Д','Ж','Э'],
     ruRow3: ['Я','Ч','С','М','И','Т','Ь','Б','Ю','Ё','Ъ'],
-    transferId: '',
-    expectedChunks: 0,
-    chunks: [],
-    received: 0,
-    row1: ['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'],
-    row2: ['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L'],
-    row3: ['Z', 'X', 'C', 'V', 'B', 'N', 'M']
+    row1: ['Q','W','E','R','T','Y','U','I','O','P'],
+    row2: ['A','S','D','F','G','H','J','K','L'],
+    row3: ['Z','X','C','V','B','N','M']
   },
-
-  onInit() {
-    this.setStatus(this.status)
-    this.setPageTitle(this.pageTitle)
-    this.setPageUrl(this.pageUrl)
-    this.setQuery(this.query)
-    this.keyboardLabelGlyphs = this.makeGlyphs('КЛАВ')
-    this.upGlyphs = this.makeGlyphs('↑ ВВЕРХ')
-    this.downGlyphs = this.makeGlyphs('↓ ВНИЗ')
-    this.updateLayoutGlyphs()
-    this.cancelGlyphs = this.makeGlyphs('ЗАКРЫТЬ КЛАВИАТУРУ')
-    this.hintGlyphs = this.makeGlyphs('Листай текст или нажимай ↑ ВВЕРХ / ↓ ВНИЗ')
-    this.bindConnection()
-  },
-
-  makeGlyphs(value) {
-    const text = String(value || '')
-    const output = []
-    for (let i = 0; i < text.length; i++) {
-      const char = text.charAt(i)
-      const code = char.charCodeAt(0)
-      output.push(code >= 0x0400 && code <= 0x04FF
-        ? {char: char, image: '/common/glyphs/u' + ('0000' + code.toString(16).toUpperCase()).slice(-4) + '.png'}
-        : {char: char, image: ''})
-    }
-    return output
-  },
-  setStatus(value) { this.status = String(value || ''); this.statusGlyphs = this.makeGlyphs(this.status) },
-  setPageTitle(value) { this.pageTitle = String(value || ''); this.titleGlyphs = this.makeGlyphs(this.pageTitle) },
-  setPageUrl(value) { this.pageUrl = String(value || ''); this.urlGlyphs = this.makeGlyphs(this.pageUrl) },
-  setQuery(value) { this.query = String(value || ''); this.queryGlyphs = this.makeGlyphs(this.query || 'Поиск или адрес сайта') },
-
+  onInit() { this.bindConnection() },
   bindConnection() {
     connection = interconnect.instance()
-    connection.onopen = () => { this.setStatus('Телефон подключён') }
-    connection.onclose = () => { this.setStatus('Связь с телефоном прервана') }
-    connection.onerror = (event) => { this.setStatus('Ошибка связи: ' + String(event && event.code || '')) }
-    connection.onmessage = (event) => {
-      const raw = event && event.data !== undefined ? event.data : ''
-      this.handleMessage(raw)
-    }
+    connection.onopen = () => { this.status = 'Телефон подключён' }
+    connection.onclose = () => { this.status = 'Связь с телефоном прервана' }
+    connection.onerror = (event) => { this.status = 'Ошибка связи: ' + String(event && event.code || '') }
+    connection.onmessage = (event) => { this.handleMessage(event && event.data !== undefined ? event.data : '') }
     connection.getReadyState({
-      success: (result) => {
-        this.setStatus(result && result.status === 1 ? 'Телефон подключён' : 'Ожидаем приложение на телефоне…')
-      },
-      fail: () => { this.setStatus('Ожидаем соединение с телефоном…') }
+      success: (result) => { this.status = result && result.status === 1 ? 'Телефон подключён' : 'Ожидаем приложение на телефоне…' },
+      fail: () => { this.status = 'Ожидаем соединение с телефоном…' }
     })
   },
-
   handleMessage(raw) {
     let message
-    try {
-      message = typeof raw === 'string' ? JSON.parse(raw) : raw
-    } catch (error) {
-      this.setStatus('Не удалось прочитать сообщение')
-      return
-    }
+    try { message = typeof raw === 'string' ? JSON.parse(raw) : raw }
+    catch (error) { this.status = 'Не удалось прочитать ответ'; return }
     if (!message || !message.type) return
-
     if (message.type === 'page_start') {
       this.transferId = message.id || ''
-      this.setPageTitle(message.title || 'Страница')
-      this.setPageUrl(message.url || '')
       this.expectedChunks = Number(message.chunks || 0)
       this.chunks = []
       this.received = 0
-      this.pageText = ''
-      this.visualPage = false
-      this.pageLinks = []
-      this.pageImages.forEach((item) => {
-        file.delete({uri: item.uri, success: () => {}, fail: () => {}})
-      })
-      this.pageImages = []
-      this.setStatus('Получаем страницу…')
+      this.status = 'ИИ отправляет ответ…'
     } else if (message.type === 'page_chunk') {
       if (message.id !== this.transferId) return
-      this.chunks[Number(message.index)] = this.base64ToUtf8(message.textBase64 || '')
+      const index = Number(message.index)
+      if (index < 0 || index >= this.expectedChunks) return
+      this.chunks[index] = this.base64ToUtf8(message.textBase64 || '')
       this.received++
-      this.setStatus('Загрузка страницы: ' + this.received + '/' + this.expectedChunks)
+      this.status = 'Получаем ответ: ' + this.received + '/' + this.expectedChunks
     } else if (message.type === 'page_end') {
       if (message.id !== this.transferId) return
-      const content = this.chunks.join('')
-      const marker = '\n\n__WRIST_LINKS__\n'
-      const markerIndex = content.indexOf(marker)
-      if (markerIndex >= 0) {
-        const pageContent = content.slice(0, markerIndex)
-        this.visualPage = pageContent.indexOf('__WRIST_VISUAL_PAGE__') === 0
-        this.pageText = this.visualPage ? '' : pageContent
-        try {
-          this.pageLinks = (JSON.parse(content.slice(markerIndex + marker.length)) || []).map((item) => Object.assign({}, item, {glyphs: this.makeGlyphs(item.title || '')}))
-        } catch (error) {
-          this.pageLinks = []
-        }
-      } else {
-        this.pageText = content
-        this.visualPage = false
-        this.pageLinks = []
-      }
-      this.setStatus('Страница загружена')
+      const answer = this.chunks.join('').trim()
+      if (answer) this.conversation = this.conversation + '\n\nИИ:\n' + answer
+      this.status = answer ? 'Ответ получен' : 'ИИ вернул пустой ответ'
+      this.chunks = []
       this.sendCommand('page_ack', {id: this.transferId, ok: true})
-    } else if (message.type === 'browser_image_start') {
-      this.imageTransferId = String(message.id || '')
-      this.imageTitle = String(message.title || 'Изображение')
-      this.imageExpectedChunks = Number(message.chunks || 0)
-      this.imageChunks = []
-      this.imageReceivedChunks = 0
-      this.setStatus('Получаем изображение…')
-    } else if (message.type === 'browser_image_chunk') {
-      if (message.id !== this.imageTransferId) return
-      const index = Number(message.index)
-      if (index < 0 || index >= this.imageExpectedChunks) return
-      this.imageChunks[index] = message.data || ''
-      this.imageReceivedChunks = this.imageChunks.filter((part) => typeof part === 'string').length
-      this.sendCommand('browser_image_chunk_ack', {id: this.imageTransferId, index: index})
-      this.setStatus('Изображение: ' + this.imageReceivedChunks + '/' + this.imageExpectedChunks)
-    } else if (message.type === 'browser_image_end') {
-      if (message.id !== this.imageTransferId) return
-      if (!this.imageExpectedChunks || this.imageReceivedChunks !== this.imageExpectedChunks) {
-        this.sendCommand('browser_image_ack', {id: this.imageTransferId, ok: false, error: 'Не все части изображения получены'})
-        this.setStatus('Изображение получено не полностью')
-        return
-      }
-      const base64 = this.imageChunks.join('')
-      const safeId = this.imageTransferId.replace(/[^a-zA-Z0-9_-]/g, '')
-      const uri = 'internal://cache/wristbrowser-' + safeId + '.jpg'
-      const imageBytes = this.base64ToUint8Array(base64)
-      if (imageBytes.length < 4 || imageBytes[0] !== 255 || imageBytes[1] !== 216) {
-        this.sendCommand('browser_image_ack', {id: this.imageTransferId, ok: false, error: 'Полученные данные не являются JPEG'})
-        this.setStatus('Полученные данные повреждены: JPEG не распознан')
-        this.imageChunks = []
-        return
-      }
-      file.writeArrayBuffer({
-        uri: uri,
-        buffer: imageBytes,
-        success: () => {
-          file.get({
-            uri: uri,
-            success: (info) => {
-              if (!info || Number(info.length || 0) !== imageBytes.length) {
-                this.sendCommand('browser_image_ack', {id: this.imageTransferId, ok: false, error: 'Размер сохранённого файла не совпадает'})
-                this.setStatus('Файл записан не полностью')
-                return
-              }
-              this.pageImages = this.pageImages.concat([{uri: uri, title: this.imageTitle}])
-              this.sendCommand('browser_image_ack', {id: this.imageTransferId, ok: true, bytes: info.length})
-              this.setStatus('Изображение сохранено: ' + info.length + ' байт')
-              this.imageChunks = []
-            },
-            fail: (error, code) => {
-              this.sendCommand('browser_image_ack', {id: this.imageTransferId, ok: false, error: 'file verify error ' + String(code || '')})
-              this.setStatus('Не удалось проверить сохранённый файл')
-            }
-          })
-        },
-        fail: (error, code) => {
-          this.sendCommand('browser_image_ack', {id: this.imageTransferId, ok: false, error: 'file error ' + String(code || '')})
-          this.setStatus('Не удалось сохранить изображение')
-          this.imageChunks = []
-        }
-      })
     } else if (message.type === 'transfer_error') {
-      this.setStatus(message.message || 'Ошибка передачи страницы')
+      this.status = message.message || 'Ошибка передачи ответа'
     }
   },
-
   base64ToUtf8(base64) {
-    const bytes = this.base64ToUint8Array(base64)
-    let encoded = ''
-    for (let i = 0; i < bytes.length; i++) {
-      encoded += '%' + ('0' + bytes[i].toString(16)).slice(-2)
-    }
-    try {
-      return decodeURIComponent(encoded)
-    } catch (error) {
-      this.setStatus('Ошибка декодирования текста UTF-8')
-      return ''
-    }
-  },
-
-  base64ToUint8Array(base64) {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
     const len = base64.length
     let size = Math.floor((len * 3) / 4)
     if (base64[len - 1] === '=') size--
     if (base64[len - 2] === '=') size--
-    const output = new Uint8Array(size)
+    const bytes = new Uint8Array(size)
     let position = 0
     for (let i = 0; i < len; i += 4) {
-      const a = chars.indexOf(base64[i])
-      const b = chars.indexOf(base64[i + 1])
-      const cc = base64[i + 2] === '=' ? 0 : chars.indexOf(base64[i + 2])
+      const a = chars.indexOf(base64[i]), b = chars.indexOf(base64[i + 1])
+      const c = base64[i + 2] === '=' ? 0 : chars.indexOf(base64[i + 2])
       const d = base64[i + 3] === '=' ? 0 : chars.indexOf(base64[i + 3])
-      if (position < size) output[position++] = (a << 2) | (b >> 4)
-      if (position < size) output[position++] = ((b & 15) << 4) | (cc >> 2)
-      if (position < size) output[position++] = ((cc & 3) << 6) | d
+      if (position < size) bytes[position++] = (a << 2) | (b >> 4)
+      if (position < size) bytes[position++] = ((b & 15) << 4) | (c >> 2)
+      if (position < size) bytes[position++] = ((c & 3) << 6) | d
     }
-    return output
+    let encoded = ''
+    for (let i = 0; i < bytes.length; i++) encoded += '%' + ('0' + bytes[i].toString(16)).slice(-2)
+    try { return decodeURIComponent(encoded) } catch (error) { return '' }
   },
-
   sendCommand(type, extra) {
     if (!connection) connection = interconnect.instance()
-    const data = Object.assign({type: type}, extra || {})
     connection.send({
-      data: data,
+      data: Object.assign({type: type}, extra || {}),
       success: () => {},
-      fail: (error, code) => { this.setStatus('Не удалось отправить команду: ' + String(code || '')) },
+      fail: (error, code) => { this.status = 'Не удалось отправить: ' + String(code || '') }
     })
   },
-
-  onImageComplete() {
-    this.setStatus('Изображение отображено')
-  },
-  onImageError() {
-    this.setStatus('Файл получен, но часы не смогли показать изображение')
-  },
-  tapPage(event) {
-    const x = Number(event && event.offsetX)
-    const y = Number(event && event.offsetY)
-    if (!isFinite(x) || !isFinite(y)) {
-      this.setStatus('Не удалось определить точку нажатия')
-      return
-    }
-    const pageX = Math.max(0, Math.min(418, Math.round(x / 380 * 418)))
-    const pageY = Math.max(0, Math.min(260, Math.round(y / 236 * 260)))
-    this.sendCommand('tap', {x: pageX, y: pageY})
-    this.setStatus('Нажатие отправлено на страницу…')
-  },
-  updateLayoutGlyphs() { this.layoutGlyphs = this.makeGlyphs(this.keyboardLanguage === 'ru' ? 'РУС ✓ | EN' : 'РУС | EN ✓') },
-  toggleKeyboardLanguage() { this.keyboardLanguage = this.keyboardLanguage === 'ru' ? 'en' : 'ru'; this.updateLayoutGlyphs() },
-  openLink(item) {
-    const link = item && typeof item === 'object' ? item : {url: item}
-    const target = String(link.url || '')
-    if (target.indexOf('https://') === 0) {
-      this.sendCommand('open_link', {url: target})
-      this.setStatus('Открываем ссылку…')
-      return
-    }
-    const actionId = String(link.actionId || '')
-    if (/^wrist-(input-)?[0-9]{1,3}$/.test(actionId)) {
-      const isInput = actionId.indexOf('wrist-input-') === 0
-      if (isInput) {
-        this.typingIntoPage = true
-        this.setQuery('')
-        this.keyboardVisible = true
-      }
-      this.sendCommand('click_element', {actionId: actionId})
-      this.setStatus(isInput ? 'Введи текст в выбранное поле.' : 'Открываем раздел…')
-      return
-    }
-    this.setStatus('Эта ссылка не поддерживается')
-  },
-  showKeyboard() { this.typingIntoPage = false; this.keyboardVisible = true },
-  hideKeyboard() { this.keyboardVisible = false; this.typingIntoPage = false },
-  appendKey(key) { this.setQuery(String(this.query || '') + String(key || '')) },
-  deleteKey() { this.setQuery(String(this.query || '').slice(0, -1)) },
-  submitSearch() {
-    const value = String(this.query || '').trim()
-    if (!value) return
+  showKeyboard() { this.keyboardVisible = true },
+  hideKeyboard() { this.keyboardVisible = false },
+  appendKey(key) { this.query = String(this.query || '') + String(key || '') },
+  deleteKey() { this.query = String(this.query || '').slice(0, -1) },
+  clearInput() { this.query = '' },
+  toggleKeyboardLanguage() { this.keyboardLanguage = this.keyboardLanguage === 'ru' ? 'en' : 'ru' },
+  submitPrompt() {
+    const prompt = String(this.query || '').trim()
+    if (!prompt) return
+    if (prompt.length > 4000) { this.status = 'Вопрос слишком длинный (максимум 4000 символов)'; return }
+    this.conversation = this.conversation + '\n\nТы:\n' + prompt
+    this.query = ''
     this.keyboardVisible = false
-    if (this.typingIntoPage) {
-      this.sendCommand('type_text', {text: value, submit: true})
-      this.typingIntoPage = false
-      this.setStatus('Вводим текст на странице…')
-    } else if (this.aiMode) {
-      this.sendCommand('ai_prompt', {prompt: value})
-      this.setStatus('Отправляем вопрос в Gemini 3.8 Flash…')
-    } else {
-      this.sendCommand('search', {query: value})
-      this.setStatus('Ищем: ' + value)
-    }
-  },
-  toggleAiMode() {
-    this.aiMode = !this.aiMode
-    this.typingIntoPage = false
-    this.setStatus(this.aiMode ? 'Режим Gemini AI включён. Введи вопрос.' : 'Режим браузера включён.')
+    this.status = 'Отправляем вопрос на телефон…'
+    this.sendCommand('ai_prompt', {prompt: prompt})
   }
 }
 </script>
-
 <style>
-.page {
-  width: 466px;
-  height: 466px;
-  flex-direction: column;
-  align-items: center;
-  padding: 14px 18px 10px;
-  box-sizing: border-box;
-  background-color: #101820;
-}
-.brand { color: #8ed6c5; font-size: 20px; font-weight: bold; margin-bottom: 3px; }
-.status { width: 420px; color: #8ed6c5; font-size: 13px; text-align: center; margin-bottom: 6px; }
-.toolbar { width: 420px; height: 42px; flex-direction: row; align-items: center; margin-bottom: 5px; }
-.address { width: 200px; height: 40px; color: #ffffff; background-color: #263440; font-size: 14px; padding: 8px; }
-.keyboardButton { width: 68px; height: 40px; color: #ffffff; background-color: #526675; font-size: 12px; margin-left: 4px; }
-.go { width: 60px; height: 40px; color: #101820; background-color: #8ed6c5; font-size: 14px; margin-left: 4px; }
-.aiButton { width: 58px; height: 40px; color: #101820; background-color: #8ed6c5; font-size: 13px; align-items: center; justify-content: center; margin-left: 4px; margin-right: 4px; }
-.controls { width: 420px; height: 34px; flex-direction: row; justify-content: space-between; margin-bottom: 5px; }
-.control { width: 100px; height: 32px; color: #101820; background-color: #8ed6c5; font-size: 12px; }
-.heading { width: 420px; color: #ffffff; font-size: 18px; font-weight: bold; max-lines: 2; margin-bottom: 2px; }
-.url { width: 420px; color: #91a1ad; font-size: 10px; max-lines: 1; margin-bottom: 5px; }
-.readerArea { width: 420px; height: 285px; }
-.reader { width: 420px; height: 285px; }
-.body { width: 410px; color: #e2e8ed; font-size: 17px; }
-.imageList { width: 410px; flex-direction: column; align-items: center; margin-top: 8px; margin-bottom: 8px; }
-.pageImage { width: 380px; height: 236px; object-fit: contain; margin-bottom: 8px; }
-.linkList { width: 410px; flex-direction: column; margin-top: 8px; }
-.link { width: 405px; color: #8ed6c5; font-size: 15px; padding: 8px 4px; border-bottom: 1px solid #344653; }
-.glyphLine { flex-direction: row; flex-wrap: wrap; align-items: center; }
-.glyphCell { flex-direction: row; align-items: center; }
-.uiGlyph { width: 14px; height: 17px; object-fit: contain; }
-.plainGlyph { color: #ffffff; font-size: 14px; }
-.status .plainGlyph { color: #8ed6c5; font-size: 13px; }
-.heading .uiGlyph { width: 17px; height: 20px; }
-.heading .plainGlyph { font-size: 18px; font-weight: bold; }
-.url .uiGlyph { width: 10px; height: 12px; }
-.url .plainGlyph { color: #91a1ad; font-size: 10px; }
-.address .plainGlyph { font-size: 14px; }
-.link .uiGlyph { width: 14px; height: 17px; }
-.link .plainGlyph { color: #8ed6c5; font-size: 15px; }
-.typed .uiGlyph { width: 16px; height: 19px; }
-.typed .plainGlyph { color: #ffffff; font-size: 16px; }
-.hint { width: 420px; color: #8797a3; font-size: 10px; text-align: center; margin-top: 5px; }
-.keyboard { width: 430px; height: 330px; flex-direction: column; align-items: center; justify-content: flex-start; }
-.keyRow { width: 430px; height: 43px; flex-direction: row; justify-content: center; align-items: center; margin-bottom: 4px; }
-.key { min-width: 29px; height: 38px; color: #ffffff; background-color: #344653; font-size: 14px; text-align: center; padding: 8px 2px; margin-left: 1px; margin-right: 1px; }
-.imageKey { width: 32px; min-width: 32px; height: 38px; padding: 2px; align-items: center; justify-content: center; }
-.glyph { width: 30px; height: 30px; object-fit: contain; }
- .layoutToggle { color: #8ed6c5; font-size: 11px; padding: 3px; }
-.typed { width: 410px; height: 38px; color: #ffffff; background-color: #263440; font-size: 16px; text-align: center; padding: 8px; margin-bottom: 5px; }
-
-.special { background-color: #526675; }
-.spaceKey { width: 105px; font-size: 11px; }
-.goKey { width: 48px; color: #101820; background-color: #8ed6c5; font-size: 13px; }
-.cancel { color: #9aa7b2; font-size: 11px; padding: 4px; }
+.page { width:466px; height:466px; padding:18px 20px 14px; box-sizing:border-box; flex-direction:column; background-color:#101820; align-items:center; }
+.brand { color:#ffffff; font-size:30px; font-weight:bold; margin-bottom:4px; }
+.status { color:#9eb2c4; font-size:15px; height:24px; }
+.chat { width:100%; height:230px; margin-top:8px; margin-bottom:8px; background-color:#182633; border-radius:14px; padding:12px; box-sizing:border-box; }
+.conversation { color:#f1f5f9; font-size:19px; line-height:1.35; }
+.composer { width:100%; min-height:42px; background-color:#263746; border-radius:12px; padding:10px; box-sizing:border-box; }
+.prompt { color:#ffffff; font-size:17px; }
+.actions { width:100%; flex-direction:row; justify-content:space-between; margin-top:7px; }
+.send { color:#071b26; background-color:#70d6bd; font-size:17px; font-weight:bold; padding:9px 20px; border-radius:12px; }
+.clear { color:#d7e1e8; font-size:16px; padding:9px 12px; }
+.keyboard { width:100%; margin-top:6px; background-color:#182633; padding:6px; border-radius:12px; }
+.keyRow { width:100%; flex-direction:row; justify-content:center; margin-bottom:4px; }
+.key { color:#ffffff; background-color:#34495b; font-size:17px; padding:7px 8px; margin:2px; border-radius:7px; }
+.special { background-color:#476176; }
+.spaceKey { padding-left:28px; padding-right:28px; }
 </style>
