@@ -139,7 +139,7 @@ class MainActivity : ComponentActivity() {
                     else -> ""
                 }
                 if (answer.isBlank()) throw IllegalStateException("OpenRouter вернул пустой ответ")
-                mainHandler.post { callback(answer.take(1000), null) }
+                mainHandler.post { callback(answer.take(6000), null) }
             } catch (error: Exception) {
                 mainHandler.post { callback(null, error.message ?: "Не удалось связаться с OpenRouter") }
             } finally {
@@ -210,7 +210,7 @@ class MainActivity : ComponentActivity() {
             }
 
             fun submitPrompt(rawPrompt: String) {
-                val prompt = rawPrompt.trim().take(2500)
+                val prompt = rawPrompt.trim().take(4000)
                 when {
                     prompt.isBlank() -> status = "Сначала скажи или введи вопрос."
                     apiKey.isBlank() -> status = "Сначала введи OpenRouter API key в приложении."
@@ -229,7 +229,7 @@ class MainActivity : ComponentActivity() {
                         val requestBody = JSONObject()
                             .put("model", selectedModelId)
                             .put("messages", messages)
-                            .put("max_tokens", 450)
+                            .put("max_tokens", 1200)
                         requestOpenRouter(apiKey.trim(), requestBody) { answer, error ->
                             busy = false
                             if (answer == null) {
@@ -237,7 +237,7 @@ class MainActivity : ComponentActivity() {
                                 status = message
                                 bridge.send(WebPage("wristai://reply", "WristAI", message), emptyList()) { result -> status = result }
                             } else {
-                                history = (history + listOf("user" to prompt.take(600), "model" to answer.take(1000))).takeLast(4)
+                                history = (history + listOf("user" to prompt.take(600), "model" to answer.take(3000))).takeLast(4)
                                 promptDraft = ""
                                 if (speakReplies && ttsReady) {
                                     textToSpeech.speak(
