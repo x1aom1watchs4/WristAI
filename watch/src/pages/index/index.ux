@@ -4,13 +4,13 @@
     <div class="glyphLine status"><div class="glyphCell" for="{{item in statusGlyphs}}"><image if="{{item.image}}" class="uiGlyph" src="{{item.image}}" /><text if="{{!item.image}}" class="plainGlyph">{{item.char}}</text></div></div>
     <div class="toolbar">
       <div class="glyphLine address" @click="showKeyboard"><div class="glyphCell" for="{{item in queryGlyphs}}"><image if="{{item.image}}" class="uiGlyph" src="{{item.image}}" /><text if="{{!item.image}}" class="plainGlyph">{{item.char}}</text></div></div>
-      <input type="button" class="keyboardButton" value="КЛАВ" @click="showKeyboard" />
+      <div class="keyboardButton glyphLine" @click="showKeyboard"><div class="glyphCell" for="{{item in keyboardLabelGlyphs}}"><image if="{{item.image}}" class="uiGlyph" src="{{item.image}}" /><text if="{{!item.image}}" class="plainGlyph">{{item.char}}</text></div></div>
       <input type="button" class="go" value="GO" @click="submitSearch" />
     </div>
     <div class="controls" if="{{!keyboardVisible}}">
       <input type="button" class="control" value="BACK" @click="sendCommand('back')" />
-      <input type="button" class="control" value="↑ ВВЕРХ" @click="sendCommand('scroll', {delta: -420})" />
-      <input type="button" class="control" value="↓ ВНИЗ" @click="sendCommand('scroll', {delta: 420})" />
+      <div class="control glyphLine" @click="sendCommand('scroll', {delta: -420})"><div class="glyphCell" for="{{item in upGlyphs}}"><image if="{{item.image}}" class="uiGlyph" src="{{item.image}}" /><text if="{{!item.image}}" class="plainGlyph">{{item.char}}</text></div></div>
+      <div class="control glyphLine" @click="sendCommand('scroll', {delta: 420})"><div class="glyphCell" for="{{item in downGlyphs}}"><image if="{{item.image}}" class="uiGlyph" src="{{item.image}}" /><text if="{{!item.image}}" class="plainGlyph">{{item.char}}</text></div></div>
       <input type="button" class="control" value="NEXT" @click="sendCommand('forward')" />
     </div>
     <div class="glyphLine heading" if="{{!keyboardVisible}}"><div class="glyphCell" for="{{item in titleGlyphs}}"><image if="{{item.image}}" class="uiGlyph" src="{{item.image}}" /><text if="{{!item.image}}" class="plainGlyph">{{item.char}}</text></div></div>
@@ -29,7 +29,7 @@
     </div>
     <div if="{{keyboardVisible}}" class="keyboard">
       <div class="typed glyphLine"><div class="glyphCell" for="{{item in queryGlyphs}}"><image if="{{item.image}}" class="uiGlyph" src="{{item.image}}" /><text if="{{!item.image}}" class="plainGlyph">{{item.char}}</text></div><text class="plainGlyph">_</text></div>
-      <text class="layoutToggle" @click="toggleKeyboardLanguage">{{keyboardLanguage === 'ru' ? 'РУС ✓  |  EN' : 'РУС  |  EN ✓'}}</text>
+      <div class="layoutToggle glyphLine" @click="toggleKeyboardLanguage"><div class="glyphCell" for="{{item in layoutGlyphs}}"><image if="{{item.image}}" class="uiGlyph" src="{{item.image}}" /><text if="{{!item.image}}" class="plainGlyph">{{item.char}}</text></div></div>
       <div class="keyRow" if="{{keyboardLanguage === 'en'}}">
         <text class="key" for="{{item in row1}}" @click="appendKey(item)">{{item}}</text>
       </div>
@@ -84,9 +84,9 @@
         <text class="key special" @click="appendKey('/')">/</text>
         <text class="key goKey" @click="submitSearch">GO</text>
       </div>
-      <text class="cancel" @click="hideKeyboard">ЗАКРЫТЬ КЛАВИАТУРУ</text>
+      <div class="cancel glyphLine" @click="hideKeyboard"><div class="glyphCell" for="{{item in cancelGlyphs}}"><image if="{{item.image}}" class="uiGlyph" src="{{item.image}}" /><text if="{{!item.image}}" class="plainGlyph">{{item.char}}</text></div></div>
     </div>
-    <text class="hint" if="{{!keyboardVisible}}">Листай текст или нажимай ↑ ВВЕРХ / ↓ ВНИЗ</text>
+    <div class="hint glyphLine" if="{{!keyboardVisible}}"><div class="glyphCell" for="{{item in hintGlyphs}}"><image if="{{item.image}}" class="uiGlyph" src="{{item.image}}" /><text if="{{!item.image}}" class="plainGlyph">{{item.char}}</text></div></div>
   </div>
 </template>
 
@@ -100,6 +100,7 @@ export default {
   private: {
     status: 'Подключаемся к телефону…',
     statusGlyphs: [], titleGlyphs: [], urlGlyphs: [], queryGlyphs: [],
+    keyboardLabelGlyphs: [], upGlyphs: [], downGlyphs: [], layoutGlyphs: [], cancelGlyphs: [], hintGlyphs: [],
     pageTitle: 'Открой сайт в приложении на телефоне',
     pageUrl: '',
     visualPage: false,
@@ -132,6 +133,12 @@ export default {
     this.setPageTitle(this.pageTitle)
     this.setPageUrl(this.pageUrl)
     this.setQuery(this.query)
+    this.keyboardLabelGlyphs = this.makeGlyphs('КЛАВ')
+    this.upGlyphs = this.makeGlyphs('↑ ВВЕРХ')
+    this.downGlyphs = this.makeGlyphs('↓ ВНИЗ')
+    this.updateLayoutGlyphs()
+    this.cancelGlyphs = this.makeGlyphs('ЗАКРЫТЬ КЛАВИАТУРУ')
+    this.hintGlyphs = this.makeGlyphs('Листай текст или нажимай ↑ ВВЕРХ / ↓ ВНИЗ')
     this.bindConnection()
   },
 
@@ -348,7 +355,8 @@ export default {
     this.sendCommand('tap', {x: pageX, y: pageY})
     this.setStatus('Нажатие отправлено на страницу…')
   },
-  toggleKeyboardLanguage() { this.keyboardLanguage = this.keyboardLanguage === 'ru' ? 'en' : 'ru' },
+  updateLayoutGlyphs() { this.layoutGlyphs = this.makeGlyphs(this.keyboardLanguage === 'ru' ? 'РУС ✓ | EN' : 'РУС | EN ✓') },
+  toggleKeyboardLanguage() { this.keyboardLanguage = this.keyboardLanguage === 'ru' ? 'en' : 'ru'; this.updateLayoutGlyphs() },
   openLink(item) {
     const link = item && typeof item === 'object' ? item : {url: item}
     const target = String(link.url || '')
