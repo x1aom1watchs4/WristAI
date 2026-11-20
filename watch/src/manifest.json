@@ -1,34 +1,12 @@
 {
   "package": "com.wristbrowser",
-  "name": "WristBrowser",
-  "versionName": "0.2.3",
-  "versionCode": 6,
+  "name": "WristAI",
+  "versionName": "0.3.0",
+  "versionCode": 7,
   "minPlatformVersion": 1000,
-  "deviceTypeList": [
-    "watch"
-  ],
-  "features": [
-    {
-      "name": "system.router"
-    },
-    {
-      "name": "system.interconnect"
-    },
-    {
-      "name": "system.file"
-    }
-  ],
-  "config": {
-    "logLevel": "info",
-    "designWidth": 466
-  },
-  "router": {
-    "entry": "pages/index",
-    "pages": {
-      "pages/index": {
-        "component": "index"
-      }
-    }
-  },
+  "deviceTypeList": ["watch"],
+  "features": [{"name":"system.router"},{"name":"system.interconnect"}],
+  "config": {"logLevel":"info","designWidth":466},
+  "router": {"entry":"pages/index","pages":{"pages/index":{"component":"index"}}},
   "icon": "/common/wristbrowser-icon.png"
 }
