@@ -18,7 +18,8 @@
     <div if="{{!keyboardVisible}}" class="readerArea">
       <scroll class="reader" scroll-y="true" scroll-x="false">
         <div class="imageList" if="{{pageImages.length > 0}}">
-          <image for="{{item in pageImages}}" src="{{item.uri}}" class="pageImage" @complete="onImageComplete" @error="onImageError" />
+          <image if="{{visualPage}}" src="{{pageImages[0].uri}}" class="pageImage" @click="tapPage" @complete="onImageComplete" @error="onImageError" />
+          <image for="{{item in pageImages}}" if="{{!visualPage}}" src="{{item.uri}}" class="pageImage" @complete="onImageComplete" @error="onImageError" />
         </div>
         <text class="body" if="{{!visualPage}}">{{pageText}}</text>
         <div class="linkList">
@@ -312,6 +313,18 @@ export default {
   },
   onImageError() {
     this.status = 'Файл получен, но часы не смогли показать изображение'
+  },
+  tapPage(event) {
+    const x = Number(event && event.offsetX)
+    const y = Number(event && event.offsetY)
+    if (!isFinite(x) || !isFinite(y)) {
+      this.status = 'Не удалось определить точку нажатия'
+      return
+    }
+    const pageX = Math.max(0, Math.min(418, Math.round(x / 380 * 418)))
+    const pageY = Math.max(0, Math.min(260, Math.round(y / 236 * 260)))
+    this.sendCommand('tap', {x: pageX, y: pageY})
+    this.status = 'Нажатие отправлено на страницу…'
   },
   toggleKeyboardLanguage() { this.keyboardLanguage = this.keyboardLanguage === 'ru' ? 'en' : 'ru' },
   openLink(item) {
