@@ -72,26 +72,48 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun requestOpenRouter(apiKey: String, requestBody: JSONObject, callback: (String?, String?) -> Unit) {
+        val powerManager = getSystemService(android.os.PowerManager::class.java)
+        val wakeLock = powerManager.newWakeLock(
+            android.os.PowerManager.PARTIAL_WAKE_LOCK,
+            "WristAI:OpenRouterRequest"
+        )
+        // Keep the CPU awake while the foreground connection service is active and a request is in flight.
+        wakeLock.acquire(90_000L)
         Thread {
-            var connection: HttpURLConnection? = null
             try {
-                val endpoint = URL("https://openrouter.ai/api/v1/chat/completions")
-                connection = (endpoint.openConnection() as HttpURLConnection).apply {
-                    requestMethod = "POST"
-                    connectTimeout = 15000
-                    readTimeout = 60000
-                    doOutput = true
-                    setRequestProperty("Content-Type", "application/json; charset=utf-8")
-                    setRequestProperty("Accept", "application/json")
-                    setRequestProperty("Authorization", "Bearer $apiKey")
-                    setRequestProperty("HTTP-Referer", "https://github.com/x1aom1watchs4/WristBrowser")
-                    setRequestProperty("X-Title", "WristAI")
+                var lastError: Exception? = null
+                var responseText = ""
+                var responseCode = 0
+                for (attempt in 0 until 3) {
+                    var connection: HttpURLConnection? = null
+                    try {
+                        val endpoint = URL("https://openrouter.ai/api/v1/chat/completions")
+                        connection = (endpoint.openConnection() as HttpURLConnection).apply {
+                            requestMethod = "POST"
+                            connectTimeout = 20000
+                            readTimeout = 60000
+                            doOutput = true
+                            setRequestProperty("Content-Type", "application/json; charset=utf-8")
+                            setRequestProperty("Accept", "application/json")
+                            setRequestProperty("Authorization", "Bearer $apiKey")
+                            setRequestProperty("HTTP-Referer", "https://github.com/x1aom1watchs4/WristBrowser")
+                            setRequestProperty("X-Title", "WristAI")
+                        }
+                        connection.outputStream.use { it.write(requestBody.toString().toByteArray(Charsets.UTF_8)) }
+                        responseCode = connection.responseCode
+                        responseText = (if (responseCode in 200..299) connection.inputStream else connection.errorStream)
+                            ?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty()
+                        lastError = null
+                        break
+                    } catch (error: java.net.UnknownHostException) {
+                        lastError = error
+                        if (attempt < 2) Thread.sleep(1000L * (attempt + 1))
+                    } finally {
+                        connection?.disconnect()
+                    }
                 }
-                connection.outputStream.use { it.write(requestBody.toString().toByteArray(Charsets.UTF_8)) }
-                val code = connection.responseCode
-                val responseText = (if (code in 200..299) connection.inputStream else connection.errorStream)
-                    ?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty()
-                if (code !in 200..299) {
+                if (lastError != null) throw lastError!!
+                if (responseCode !in 200..299) {
                     val detail = try {
                         val error = JSONObject(responseText).optJSONObject("error")
                         val message = error?.optString("message")?.takeIf { it.isNotBlank() }
@@ -101,7 +123,7 @@ class MainActivity : ComponentActivity() {
                         listOfNotNull(message, provider?.let { "Provider: " + it }, raw?.let { "Details: " + it.take(500) })
                             .joinToString(" · ")
                     } catch (_: Exception) { null }
-                    throw IllegalStateException(detail?.takeIf { it.isNotBlank() } ?: "OpenRouter HTTP $code")
+                    throw IllegalStateException(detail?.takeIf { it.isNotBlank() } ?: "OpenRouter HTTP $responseCode")
                 }
                 val json = JSONObject(responseText)
                 val message = json.optJSONArray("choices")?.optJSONObject(0)?.optJSONObject("message")
@@ -117,12 +139,11 @@ class MainActivity : ComponentActivity() {
                     else -> ""
                 }
                 if (answer.isBlank()) throw IllegalStateException("OpenRouter вернул пустой ответ")
-                // Keep the Bluetooth payload small so long model replies do not overload the watch UI.
                 mainHandler.post { callback(answer.take(1000), null) }
             } catch (error: Exception) {
-                mainHandler.post { callback(null, error.message ?: "Не удалось связаться с Gemini") }
+                mainHandler.post { callback(null, error.message ?: "Не удалось связаться с OpenRouter") }
             } finally {
-                connection?.disconnect()
+                if (wakeLock.isHeld) wakeLock.release()
             }
         }.start()
     }
