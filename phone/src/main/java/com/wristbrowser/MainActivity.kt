@@ -132,7 +132,7 @@ class MainActivity : ComponentActivity() {
                                 busy -> status = "ИИ уже готовит ответ. Подожди завершения."
                                 else -> {
                                     busy = true
-                                    status = "Gemini 4 Neon обрабатывает вопрос…"
+                                    status = "Gemma 4 26B A4B обрабатывает вопрос…"
                                     val messages = JSONArray()
                                     history.forEach { turn ->
                                         messages.put(JSONObject()
@@ -141,17 +141,17 @@ class MainActivity : ComponentActivity() {
                                     }
                                     messages.put(JSONObject().put("role", "user").put("content", prompt))
                                     val requestBody = JSONObject()
-                                        .put("model", "google/gemini-4-neon")
+                                        .put("model", "google/gemma-4-26b-a4b-it:free")
                                         .put("messages", messages)
-                                        .put("max_tokens", 1400)
+                                        .put("max_tokens", 600)
                                     requestOpenRouter(apiKey.trim(), requestBody) { answer, error ->
                                         busy = false
                                         if (answer == null) {
-                                            val message = "Ошибка OpenRouter / Gemini 4 Neon: " + (error ?: "неизвестная ошибка")
+                                            val message = "Ошибка OpenRouter / Gemma 4 26B A4B: " + (error ?: "неизвестная ошибка")
                                             status = message
                                             bridge.send(WebPage("wristai://reply", "WristAI", message), emptyList()) { result -> status = result }
                                         } else {
-                                            history = (history + listOf("user" to prompt, "model" to answer)).takeLast(12)
+                                            history = (history + listOf("user" to prompt.take(800), "model" to answer.take(1200))).takeLast(6)
                                             status = "Ответ получен. Передаём на часы…"
                                             bridge.send(WebPage("wristai://reply", "WristAI", answer), emptyList()) { result -> status = result }
                                         }
@@ -173,7 +173,7 @@ class MainActivity : ComponentActivity() {
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         Text("WristAI", fontSize = 30.sp, style = MaterialTheme.typography.headlineMedium)
-                        Text("Телефон — сервер ИИ. Часы отправляют текстовые вопросы, телефон обращается к Gemini 4 Neon через OpenRouter и возвращает ответы.")
+                        Text("Телефон обрабатывает вопросы через Gemma 4 26B A4B (OpenRouter). Часы показывают облегчённую текстовую переписку.")
                         OutlinedTextField(
                             value = apiKey, onValueChange = {
                                 apiKey = it
