@@ -39,11 +39,11 @@ data class PageImage(val title: String, val jpeg: ByteArray)
 class MainActivity : ComponentActivity() {
     private val mainHandler = Handler(Looper.getMainLooper())
 
-    private fun requestGemini(apiKey: String, requestBody: JSONObject, callback: (String?, String?) -> Unit) {
+    private fun requestOpenRouter(apiKey: String, requestBody: JSONObject, callback: (String?, String?) -> Unit) {
         Thread {
             var connection: HttpURLConnection? = null
             try {
-                val endpoint = URL("https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent")
+                val endpoint = URL("https://openrouter.ai/api/v1/chat/completions")
                 connection = (endpoint.openConnection() as HttpURLConnection).apply {
                     requestMethod = "POST"
                     connectTimeout = 15000
@@ -51,7 +51,9 @@ class MainActivity : ComponentActivity() {
                     doOutput = true
                     setRequestProperty("Content-Type", "application/json; charset=utf-8")
                     setRequestProperty("Accept", "application/json")
-                    setRequestProperty("x-goog-api-key", apiKey)
+                    setRequestProperty("Authorization", "Bearer $apiKey")
+                    setRequestProperty("HTTP-Referer", "https://github.com/x1aom1watchs4/WristBrowser")
+                    setRequestProperty("X-Title", "WristAI")
                 }
                 connection.outputStream.use { it.write(requestBody.toString().toByteArray(Charsets.UTF_8)) }
                 val code = connection.responseCode
@@ -63,14 +65,19 @@ class MainActivity : ComponentActivity() {
                     throw IllegalStateException(detail?.takeIf { it.isNotBlank() } ?: "Gemini API HTTP $code")
                 }
                 val json = JSONObject(responseText)
-                val parts = json.optJSONArray("candidates")?.optJSONObject(0)
-                    ?.optJSONObject("content")?.optJSONArray("parts")
-                val answer = buildString {
-                    if (parts != null) for (i in 0 until parts.length()) {
-                        append(parts.optJSONObject(i)?.optString("text", "").orEmpty())
-                    }
-                }.trim()
-                if (answer.isBlank()) throw IllegalStateException("Gemini вернул пустой ответ")
+                val message = json.optJSONArray("choices")?.optJSONObject(0)?.optJSONObject("message")
+                val content = message?.opt("content")
+                val answer = when (content) {
+                    is String -> content.trim()
+                    is JSONArray -> buildString {
+                        for (i in 0 until content.length()) {
+                            val part = content.optJSONObject(i)
+                            if (part?.optString("type") == "text") append(part.optString("text", ""))
+                        }
+                    }.trim()
+                    else -> ""
+                }
+                if (answer.isBlank()) throw IllegalStateException("OpenRouter вернул пустой ответ")
                 mainHandler.post { callback(answer, null) }
             } catch (error: Exception) {
                 mainHandler.post { callback(null, error.message ?: "Не удалось связаться с Gemini") }
@@ -99,26 +106,28 @@ class MainActivity : ComponentActivity() {
                             when {
                                 prompt.isBlank() -> status = "Получен пустой вопрос."
                                 apiKey.isBlank() -> {
-                                    status = "Введи Gemini API key в этом приложении."
-                                    bridge.send(WebPage("wristai://reply", "WristAI", "Сначала введи Gemini API key в приложении на телефоне."), emptyList()) { result -> status = result }
+                                    status = "Введи OpenRouter API key в этом приложении."
+                                    bridge.send(WebPage("wristai://reply", "WristAI", "Сначала введи OpenRouter API key в приложении на телефоне."), emptyList()) { result -> status = result }
                                 }
                                 busy -> status = "ИИ уже готовит ответ. Подожди завершения."
                                 else -> {
                                     busy = true
-                                    status = "Gemini обрабатывает вопрос…"
-                                    val contents = JSONArray()
+                                    status = "Gemini 4 Neon обрабатывает вопрос…"
+                                    val messages = JSONArray()
                                     history.forEach { turn ->
-                                        contents.put(JSONObject().put("role", turn.first)
-                                            .put("parts", JSONArray().put(JSONObject().put("text", turn.second))))
+                                        messages.put(JSONObject()
+                                            .put("role", if (turn.first == "model") "assistant" else turn.first)
+                                            .put("content", turn.second))
                                     }
-                                    contents.put(JSONObject().put("role", "user")
-                                        .put("parts", JSONArray().put(JSONObject().put("text", prompt))))
-                                    val requestBody = JSONObject().put("contents", contents)
-                                        .put("generationConfig", JSONObject().put("maxOutputTokens", 1400))
-                                    requestGemini(apiKey.trim(), requestBody) { answer, error ->
+                                    messages.put(JSONObject().put("role", "user").put("content", prompt))
+                                    val requestBody = JSONObject()
+                                        .put("model", "google/gemini-4-neon")
+                                        .put("messages", messages)
+                                        .put("max_tokens", 1400)
+                                    requestOpenRouter(apiKey.trim(), requestBody) { answer, error ->
                                         busy = false
                                         if (answer == null) {
-                                            val message = "Ошибка Gemini: " + (error ?: "неизвестная ошибка")
+                                            val message = "Ошибка OpenRouter / Gemini 4 Neon: " + (error ?: "неизвестная ошибка")
                                             status = message
                                             bridge.send(WebPage("wristai://reply", "WristAI", message), emptyList()) { result -> status = result }
                                         } else {
@@ -144,11 +153,11 @@ class MainActivity : ComponentActivity() {
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         Text("WristAI", fontSize = 30.sp, style = MaterialTheme.typography.headlineMedium)
-                        Text("Телефон — сервер ИИ. Часы отправляют текстовые вопросы, телефон обращается к Gemini и возвращает ответы.")
+                        Text("Телефон — сервер ИИ. Часы отправляют текстовые вопросы, телефон обращается к Gemini 4 Neon через OpenRouter и возвращает ответы.")
                         OutlinedTextField(
                             value = apiKey, onValueChange = { apiKey = it },
-                            label = { Text("Gemini API key") },
-                            placeholder = { Text("Вставь ключ Google AI Studio") },
+                            label = { Text("OpenRouter API key") },
+                            placeholder = { Text("Вставь ключ OpenRouter (sk-or-...)") },
                             visualTransformation = PasswordVisualTransformation(),
                             singleLine = true, modifier = Modifier.fillMaxWidth()
                         )
