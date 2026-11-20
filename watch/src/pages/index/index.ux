@@ -160,6 +160,7 @@ export default {
     return result
   },
   updateConversationLines() {
+    if (this.conversation.length > 1100) this.conversation = '…\n' + this.conversation.slice(-1100).replace(/^\s+/, '')
     this.conversationLines = this.makeConversationLines(this.conversation)
     this.scrollChatToBottom()
   },
