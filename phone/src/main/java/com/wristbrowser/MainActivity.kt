@@ -22,6 +22,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.platform.LocalContext
+import androidx.security.crypto.EncryptedSharedPreferences
+import androidx.security.crypto.MasterKey
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
@@ -90,8 +93,25 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
+            val context = LocalContext.current.applicationContext
+            val encryptedPrefs = remember {
+                runCatching {
+                    val masterKey = MasterKey.Builder(context)
+                        .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+                        .build()
+                    EncryptedSharedPreferences.create(
+                        context,
+                        "wristai_secure_prefs",
+                        masterKey,
+                        EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                        EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+                    )
+                }.getOrNull()
+            }
             val bridge = remember { WearableBridge(applicationContext) }
-            var apiKey by remember { mutableStateOf("") }
+            var apiKey by remember {
+                mutableStateOf(encryptedPrefs?.getString("openrouter_api_key", "") ?: "")
+            }
             var status by remember { mutableStateOf("Подключаемся к часам…") }
             var busy by remember { mutableStateOf(false) }
             var history by remember { mutableStateOf(listOf<Pair<String, String>>()) }
@@ -155,14 +175,20 @@ class MainActivity : ComponentActivity() {
                         Text("WristAI", fontSize = 30.sp, style = MaterialTheme.typography.headlineMedium)
                         Text("Телефон — сервер ИИ. Часы отправляют текстовые вопросы, телефон обращается к Gemini 4 Neon через OpenRouter и возвращает ответы.")
                         OutlinedTextField(
-                            value = apiKey, onValueChange = { apiKey = it },
+                            value = apiKey, onValueChange = {
+                                apiKey = it
+                                encryptedPrefs?.edit()?.putString("openrouter_api_key", it)?.apply()
+                            },
                             label = { Text("OpenRouter API key") },
                             placeholder = { Text("Вставь ключ OpenRouter (sk-or-...)") },
                             visualTransformation = PasswordVisualTransformation(),
                             singleLine = true, modifier = Modifier.fillMaxWidth()
                         )
-                        Text("Ключ хранится только в памяти приложения и не записывается в репозиторий или на диск.",
-                            style = MaterialTheme.typography.bodySmall)
+                        Text(
+                            if (encryptedPrefs != null) "Ключ сохраняется на телефоне в зашифрованном хранилище Android."
+                            else "Не удалось открыть зашифрованное хранилище. Ключ не будет сохранён.",
+                            style = MaterialTheme.typography.bodySmall
+                        )
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             Button(onClick = {
                                 status = "Повторно подключаемся к часам…"
