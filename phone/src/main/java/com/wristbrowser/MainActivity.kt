@@ -556,6 +556,14 @@ class MainActivity : ComponentActivity() {
                                         WebView(context).apply {
                                             settings.javaScriptEnabled = true
                                             settings.domStorageEnabled = true
+                                            settings.cacheMode = android.webkit.WebSettings.LOAD_DEFAULT
+                                            // Some sites detect Android's embedded WebView ("wv") and
+                                            // show an app-only warning instead of their mobile website.
+                                            settings.userAgentString = settings.userAgentString
+                                                .replace("; wv", "")
+                                                .replace("Version/4.0 ", "")
+                                            CookieManager.getInstance().setAcceptCookie(true)
+                                            CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
                                             settings.allowFileAccess = false
                                             settings.allowContentAccess = false
                                             settings.javaScriptCanOpenWindowsAutomatically = false
