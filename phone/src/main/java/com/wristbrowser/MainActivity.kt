@@ -37,9 +37,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.json.JSONArray
@@ -169,6 +171,22 @@ class MainActivity : ComponentActivity() {
             var busy by remember { mutableStateOf(false) }
             var history by remember { mutableStateOf(listOf<Pair<String, String>>()) }
             var promptDraft by remember { mutableStateOf("") }
+            var speakReplies by remember { mutableStateOf(false) }
+            var ttsReady by remember { mutableStateOf(false) }
+            val textToSpeech = remember {
+                android.speech.tts.TextToSpeech(context) { result ->
+                    ttsReady = result == android.speech.tts.TextToSpeech.SUCCESS
+                }
+            }
+            DisposableEffect(textToSpeech) {
+                onDispose {
+                    textToSpeech.stop()
+                    textToSpeech.shutdown()
+                }
+            }
+            LaunchedEffect(ttsReady) {
+                if (ttsReady) textToSpeech.language = java.util.Locale.getDefault()
+            }
 
             fun submitPrompt(rawPrompt: String) {
                 val prompt = rawPrompt.trim().take(2500)
@@ -200,6 +218,14 @@ class MainActivity : ComponentActivity() {
                             } else {
                                 history = (history + listOf("user" to prompt.take(600), "model" to answer.take(1000))).takeLast(4)
                                 promptDraft = ""
+                                if (speakReplies && ttsReady) {
+                                    textToSpeech.speak(
+                                        answer,
+                                        android.speech.tts.TextToSpeech.QUEUE_FLUSH,
+                                        null,
+                                        "wristai_answer"
+                                    )
+                                }
                                 status = "Ответ получен. Передаём на часы…"
                                 bridge.send(WebPage("wristai://reply", "WristAI", answer), emptyList()) { result -> status = result }
                             }
@@ -307,6 +333,14 @@ class MainActivity : ComponentActivity() {
                             "Голос распознаётся системной службой Android. WristAI не записывает и не сохраняет аудио; перед отправкой можно проверить распознанный текст.",
                             style = MaterialTheme.typography.bodySmall
                         )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("Озвучивать ответы на телефоне")
+                            Spacer(modifier = Modifier.weight(1f))
+                            Switch(checked = speakReplies, onCheckedChange = { speakReplies = it })
+                        }
+                        if (!ttsReady) {
+                            Text("Синтез речи Android пока не готов или недоступен.", style = MaterialTheme.typography.bodySmall)
+                        }
                         OutlinedTextField(
                             value = apiKey, onValueChange = {
                                 apiKey = it
