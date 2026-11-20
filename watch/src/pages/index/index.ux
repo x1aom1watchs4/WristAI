@@ -154,18 +154,18 @@ export default {
 
   bindConnection() {
     connection = interconnect.instance()
-    connection.onopen = () => { this.status = 'Телефон подключён' }
-    connection.onclose = () => { this.status = 'Связь с телефоном прервана' }
-    connection.onerror = (event) => { this.status = 'Ошибка связи: ' + String(event && event.code || '') }
+    connection.onopen = () => { this.setStatus('Телефон подключён' })
+    connection.onclose = () => { this.setStatus('Связь с телефоном прервана' })
+    connection.onerror = (event) => { this.setStatus('Ошибка связи: ' + String(event && event.code || '') })
     connection.onmessage = (event) => {
       const raw = event && event.data !== undefined ? event.data : ''
       this.handleMessage(raw)
     }
     connection.getReadyState({
       success: (result) => {
-        this.status = result && result.status === 1 ? 'Телефон подключён' : 'Ожидаем приложение на телефоне…'
+        this.setStatus(result && result.status === 1 ? 'Телефон подключён' : 'Ожидаем приложение на телефоне…')
       },
-      fail: () => { this.status = 'Ожидаем соединение с телефоном…' }
+      fail: () => { this.setStatus('Ожидаем соединение с телефоном…' })
     })
   },
 
@@ -174,15 +174,15 @@ export default {
     try {
       message = typeof raw === 'string' ? JSON.parse(raw) : raw
     } catch (error) {
-      this.status = 'Не удалось прочитать сообщение'
+      this.setStatus('Не удалось прочитать сообщение')
       return
     }
     if (!message || !message.type) return
 
     if (message.type === 'page_start') {
       this.transferId = message.id || ''
-      this.pageTitle = message.title || 'Страница'
-      this.pageUrl = message.url || ''
+      this.setPageTitle(message.title || 'Страница')
+      this.setPageUrl(message.url || '')
       this.expectedChunks = Number(message.chunks || 0)
       this.chunks = []
       this.received = 0
@@ -193,12 +193,12 @@ export default {
         file.delete({uri: item.uri, success: () => {}, fail: () => {}})
       })
       this.pageImages = []
-      this.status = 'Получаем страницу…'
+      this.setStatus('Получаем страницу…')
     } else if (message.type === 'page_chunk') {
       if (message.id !== this.transferId) return
       this.chunks[Number(message.index)] = this.base64ToUtf8(message.textBase64 || '')
       this.received++
-      this.status = 'Загрузка страницы: ' + this.received + '/' + this.expectedChunks
+      this.setStatus('Загрузка страницы: ' + this.received + '/' + this.expectedChunks)
     } else if (message.type === 'page_end') {
       if (message.id !== this.transferId) return
       const content = this.chunks.join('')
@@ -218,7 +218,7 @@ export default {
         this.visualPage = false
         this.pageLinks = []
       }
-      this.status = 'Страница загружена'
+      this.setStatus('Страница загружена')
       this.sendCommand('page_ack', {id: this.transferId, ok: true})
     } else if (message.type === 'browser_image_start') {
       this.imageTransferId = String(message.id || '')
@@ -226,7 +226,7 @@ export default {
       this.imageExpectedChunks = Number(message.chunks || 0)
       this.imageChunks = []
       this.imageReceivedChunks = 0
-      this.status = 'Получаем изображение…'
+      this.setStatus('Получаем изображение…')
     } else if (message.type === 'browser_image_chunk') {
       if (message.id !== this.imageTransferId) return
       const index = Number(message.index)
@@ -234,12 +234,12 @@ export default {
       this.imageChunks[index] = message.data || ''
       this.imageReceivedChunks = this.imageChunks.filter((part) => typeof part === 'string').length
       this.sendCommand('browser_image_chunk_ack', {id: this.imageTransferId, index: index})
-      this.status = 'Изображение: ' + this.imageReceivedChunks + '/' + this.imageExpectedChunks
+      this.setStatus('Изображение: ' + this.imageReceivedChunks + '/' + this.imageExpectedChunks)
     } else if (message.type === 'browser_image_end') {
       if (message.id !== this.imageTransferId) return
       if (!this.imageExpectedChunks || this.imageReceivedChunks !== this.imageExpectedChunks) {
         this.sendCommand('browser_image_ack', {id: this.imageTransferId, ok: false, error: 'Не все части изображения получены'})
-        this.status = 'Изображение получено не полностью'
+        this.setStatus('Изображение получено не полностью')
         return
       }
       const base64 = this.imageChunks.join('')
@@ -248,7 +248,7 @@ export default {
       const imageBytes = this.base64ToUint8Array(base64)
       if (imageBytes.length < 4 || imageBytes[0] !== 255 || imageBytes[1] !== 216) {
         this.sendCommand('browser_image_ack', {id: this.imageTransferId, ok: false, error: 'Полученные данные не являются JPEG'})
-        this.status = 'Полученные данные повреждены: JPEG не распознан'
+        this.setStatus('Полученные данные повреждены: JPEG не распознан')
         this.imageChunks = []
         return
       }
@@ -261,28 +261,28 @@ export default {
             success: (info) => {
               if (!info || Number(info.length || 0) !== imageBytes.length) {
                 this.sendCommand('browser_image_ack', {id: this.imageTransferId, ok: false, error: 'Размер сохранённого файла не совпадает'})
-                this.status = 'Файл записан не полностью'
+                this.setStatus('Файл записан не полностью')
                 return
               }
               this.pageImages = this.pageImages.concat([{uri: uri, title: this.imageTitle}])
               this.sendCommand('browser_image_ack', {id: this.imageTransferId, ok: true, bytes: info.length})
-              this.status = 'Изображение сохранено: ' + info.length + ' байт'
+              this.setStatus('Изображение сохранено: ' + info.length + ' байт')
               this.imageChunks = []
             },
             fail: (error, code) => {
               this.sendCommand('browser_image_ack', {id: this.imageTransferId, ok: false, error: 'file verify error ' + String(code || '')})
-              this.status = 'Не удалось проверить сохранённый файл'
+              this.setStatus('Не удалось проверить сохранённый файл')
             }
           })
         },
         fail: (error, code) => {
           this.sendCommand('browser_image_ack', {id: this.imageTransferId, ok: false, error: 'file error ' + String(code || '')})
-          this.status = 'Не удалось сохранить изображение'
+          this.setStatus('Не удалось сохранить изображение')
           this.imageChunks = []
         }
       })
     } else if (message.type === 'transfer_error') {
-      this.status = message.message || 'Ошибка передачи страницы'
+      this.setStatus(message.message || 'Ошибка передачи страницы')
     }
   },
 
@@ -295,7 +295,7 @@ export default {
     try {
       return decodeURIComponent(encoded)
     } catch (error) {
-      this.status = 'Ошибка декодирования текста UTF-8'
+      this.setStatus('Ошибка декодирования текста UTF-8')
       return ''
     }
   },
@@ -326,27 +326,27 @@ export default {
     connection.send({
       data: data,
       success: () => {},
-      fail: (error, code) => { this.status = 'Не удалось отправить команду: ' + String(code || '') }
+      fail: (error, code) => { this.setStatus('Не удалось отправить команду: ' + String(code || '') })
     })
   },
 
   onImageComplete() {
-    this.status = 'Изображение отображено'
+    this.setStatus('Изображение отображено')
   },
   onImageError() {
-    this.status = 'Файл получен, но часы не смогли показать изображение'
+    this.setStatus('Файл получен, но часы не смогли показать изображение')
   },
   tapPage(event) {
     const x = Number(event && event.offsetX)
     const y = Number(event && event.offsetY)
     if (!isFinite(x) || !isFinite(y)) {
-      this.status = 'Не удалось определить точку нажатия'
+      this.setStatus('Не удалось определить точку нажатия')
       return
     }
     const pageX = Math.max(0, Math.min(418, Math.round(x / 380 * 418)))
     const pageY = Math.max(0, Math.min(260, Math.round(y / 236 * 260)))
     this.sendCommand('tap', {x: pageX, y: pageY})
-    this.status = 'Нажатие отправлено на страницу…'
+    this.setStatus('Нажатие отправлено на страницу…')
   },
   toggleKeyboardLanguage() { this.keyboardLanguage = this.keyboardLanguage === 'ru' ? 'en' : 'ru' },
   openLink(item) {
@@ -354,7 +354,7 @@ export default {
     const target = String(link.url || '')
     if (target.indexOf('https://') === 0) {
       this.sendCommand('open_link', {url: target})
-      this.status = 'Открываем ссылку…'
+      this.setStatus('Открываем ссылку…')
       return
     }
     const actionId = String(link.actionId || '')
@@ -362,19 +362,19 @@ export default {
       const isInput = actionId.indexOf('wrist-input-') === 0
       if (isInput) {
         this.typingIntoPage = true
-        this.query = ''
+        this.setQuery('')
         this.keyboardVisible = true
       }
       this.sendCommand('click_element', {actionId: actionId})
-      this.status = isInput ? 'Введи текст в выбранное поле.' : 'Открываем раздел…'
+      this.setStatus(isInput ? 'Введи текст в выбранное поле.' : 'Открываем раздел…')
       return
     }
-    this.status = 'Эта ссылка не поддерживается'
+    this.setStatus('Эта ссылка не поддерживается')
   },
   showKeyboard() { this.typingIntoPage = false; this.keyboardVisible = true },
   hideKeyboard() { this.keyboardVisible = false; this.typingIntoPage = false },
-  appendKey(key) { this.query = String(this.query || '') + String(key || '') },
-  deleteKey() { this.query = String(this.query || '').slice(0, -1) },
+  appendKey(key) { this.setQuery(String(this.query || '') + String(key || '') },)
+  deleteKey() { this.setQuery(String(this.query || '').slice(0, -1) },)
   submitSearch() {
     const value = String(this.query || '').trim()
     if (!value) return
@@ -382,10 +382,10 @@ export default {
     if (this.typingIntoPage) {
       this.sendCommand('type_text', {text: value, submit: true})
       this.typingIntoPage = false
-      this.status = 'Вводим текст на странице…'
+      this.setStatus('Вводим текст на странице…')
     } else {
       this.sendCommand('search', {query: value})
-      this.status = 'Ищем: ' + value
+      this.setStatus('Ищем: ' + value)
     }
   }
 }
