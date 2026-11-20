@@ -5,6 +5,7 @@
     <div class="toolbar">
       <div class="glyphLine address" @click="showKeyboard"><div class="glyphCell" for="{{item in queryGlyphs}}"><image if="{{item.image}}" class="uiGlyph" src="{{item.image}}" /><text if="{{!item.image}}" class="plainGlyph">{{item.char}}</text></div></div>
       <div class="keyboardButton glyphLine" @click="showKeyboard"><div class="glyphCell" for="{{item in keyboardLabelGlyphs}}"><image if="{{item.image}}" class="uiGlyph" src="{{item.image}}" /><text if="{{!item.image}}" class="plainGlyph">{{item.char}}</text></div></div>
+      <div class="aiButton" @click="toggleAiMode"><text>{{aiMode ? 'AI ✓' : 'AI'}}</text></div>
       <input type="button" class="go" value="GO" @click="submitSearch" />
     </div>
     <div class="controls" if="{{!keyboardVisible}}">
@@ -113,6 +114,7 @@ export default {
     imageChunks: [],
     imageReceivedChunks: 0,
     query: '',
+    aiMode: false,
     keyboardVisible: false,
     typingIntoPage: false,
     keyboardLanguage: 'ru',
@@ -391,10 +393,18 @@ export default {
       this.sendCommand('type_text', {text: value, submit: true})
       this.typingIntoPage = false
       this.setStatus('Вводим текст на странице…')
+    } else if (this.aiMode) {
+      this.sendCommand('ai_prompt', {prompt: value})
+      this.setStatus('Отправляем вопрос в Gemini 3.8 Flash…')
     } else {
       this.sendCommand('search', {query: value})
       this.setStatus('Ищем: ' + value)
     }
+  },
+  toggleAiMode() {
+    this.aiMode = !this.aiMode
+    this.typingIntoPage = false
+    this.setStatus(this.aiMode ? 'Режим Gemini AI включён. Введи вопрос.' : 'Режим браузера включён.')
   }
 }
 </script>
@@ -412,9 +422,10 @@ export default {
 .brand { color: #8ed6c5; font-size: 20px; font-weight: bold; margin-bottom: 3px; }
 .status { width: 420px; color: #8ed6c5; font-size: 13px; text-align: center; margin-bottom: 6px; }
 .toolbar { width: 420px; height: 42px; flex-direction: row; align-items: center; margin-bottom: 5px; }
-.address { width: 260px; height: 40px; color: #ffffff; background-color: #263440; font-size: 14px; padding: 8px; }
-.keyboardButton { width: 76px; height: 40px; color: #ffffff; background-color: #526675; font-size: 12px; margin-left: 4px; }
-.go { width: 68px; height: 40px; color: #101820; background-color: #8ed6c5; font-size: 14px; margin-left: 4px; }
+.address { width: 200px; height: 40px; color: #ffffff; background-color: #263440; font-size: 14px; padding: 8px; }
+.keyboardButton { width: 68px; height: 40px; color: #ffffff; background-color: #526675; font-size: 12px; margin-left: 4px; }
+.go { width: 60px; height: 40px; color: #101820; background-color: #8ed6c5; font-size: 14px; margin-left: 4px; }
+.aiButton { width: 58px; height: 40px; color: #101820; background-color: #8ed6c5; font-size: 13px; align-items: center; justify-content: center; margin-left: 4px; margin-right: 4px; }
 .controls { width: 420px; height: 34px; flex-direction: row; justify-content: space-between; margin-bottom: 5px; }
 .control { width: 100px; height: 32px; color: #101820; background-color: #8ed6c5; font-size: 12px; }
 .heading { width: 420px; color: #ffffff; font-size: 18px; font-weight: bold; max-lines: 2; margin-bottom: 2px; }
