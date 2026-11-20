@@ -66,9 +66,16 @@ class MainActivity : ComponentActivity() {
                 val responseText = (if (code in 200..299) connection.inputStream else connection.errorStream)
                     ?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty()
                 if (code !in 200..299) {
-                    val detail = try { JSONObject(responseText).optJSONObject("error")?.optString("message") }
-                    catch (_: Exception) { null }
-                    throw IllegalStateException(detail?.takeIf { it.isNotBlank() } ?: "Gemini API HTTP $code")
+                    val detail = try {
+                        val error = JSONObject(responseText).optJSONObject("error")
+                        val message = error?.optString("message")?.takeIf { it.isNotBlank() }
+                        val metadata = error?.optJSONObject("metadata")
+                        val provider = metadata?.optString("provider_name")?.takeIf { it.isNotBlank() && it != "null" }
+                        val raw = metadata?.optString("raw")?.takeIf { it.isNotBlank() && it != "null" }
+                        listOfNotNull(message, provider?.let { "Provider: " + it }, raw?.let { "Details: " + it.take(500) })
+                            .joinToString(" · ")
+                    } catch (_: Exception) { null }
+                    throw IllegalStateException(detail?.takeIf { it.isNotBlank() } ?: "OpenRouter HTTP $code")
                 }
                 val json = JSONObject(responseText)
                 val message = json.optJSONArray("choices")?.optJSONObject(0)?.optJSONObject("message")
@@ -84,7 +91,8 @@ class MainActivity : ComponentActivity() {
                     else -> ""
                 }
                 if (answer.isBlank()) throw IllegalStateException("OpenRouter вернул пустой ответ")
-                mainHandler.post { callback(answer, null) }
+                // Keep the Bluetooth payload small so long model replies do not overload the watch UI.
+                mainHandler.post { callback(answer.take(1000), null) }
             } catch (error: Exception) {
                 mainHandler.post { callback(null, error.message ?: "Не удалось связаться с Gemini") }
             } finally {
@@ -136,7 +144,7 @@ class MainActivity : ComponentActivity() {
                         try {
                             val command = JSONObject(raw)
                             if (command.optString("type") != "ai_prompt") return@runOnUiThread
-                            val prompt = command.optString("prompt").trim().take(4000)
+                            val prompt = command.optString("prompt").trim().take(2500)
                             when {
                                 prompt.isBlank() -> status = "Получен пустой вопрос."
                                 apiKey.isBlank() -> {
@@ -149,7 +157,7 @@ class MainActivity : ComponentActivity() {
                                     val modelName = chatModels.firstOrNull { it.first == selectedModelId }?.second ?: selectedModelId
                                     status = "$modelName обрабатывает вопрос…"
                                     val messages = JSONArray()
-                                    history.forEach { turn ->
+                                    history.takeLast(4).forEach { turn ->
                                         messages.put(JSONObject()
                                             .put("role", if (turn.first == "model") "assistant" else turn.first)
                                             .put("content", turn.second))
@@ -158,7 +166,7 @@ class MainActivity : ComponentActivity() {
                                     val requestBody = JSONObject()
                                         .put("model", selectedModelId)
                                         .put("messages", messages)
-                                        .put("max_tokens", 600)
+                                        .put("max_tokens", 450)
                                     requestOpenRouter(apiKey.trim(), requestBody) { answer, error ->
                                         busy = false
                                         if (answer == null) {
@@ -166,7 +174,7 @@ class MainActivity : ComponentActivity() {
                                             status = message
                                             bridge.send(WebPage("wristai://reply", "WristAI", message), emptyList()) { result -> status = result }
                                         } else {
-                                            history = (history + listOf("user" to prompt.take(800), "model" to answer.take(1200))).takeLast(6)
+                                            history = (history + listOf("user" to prompt.take(600), "model" to answer.take(1000))).takeLast(4)
                                             status = "Ответ получен. Передаём на часы…"
                                             bridge.send(WebPage("wristai://reply", "WristAI", answer), emptyList()) { result -> status = result }
                                         }
