@@ -142,7 +142,7 @@ class MainActivity : ComponentActivity() {
         Thread {
             var connection: HttpURLConnection? = null
             try {
-                val endpoint = URL("https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=" + Uri.encode(apiKey))
+                val endpoint = URL("https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent")
                 connection = (endpoint.openConnection() as HttpURLConnection).apply {
                     requestMethod = "POST"
                     connectTimeout = 15000
@@ -150,6 +150,7 @@ class MainActivity : ComponentActivity() {
                     doOutput = true
                     setRequestProperty("Content-Type", "application/json; charset=utf-8")
                     setRequestProperty("Accept", "application/json")
+                    setRequestProperty("x-goog-api-key", apiKey)
                 }
                 connection.outputStream.use { it.write(requestBody.toString().toByteArray(Charsets.UTF_8)) }
                 val code = connection.responseCode
