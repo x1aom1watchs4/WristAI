@@ -1,6 +1,11 @@
 package com.wristbrowser
 
 import android.os.Bundle
+import android.Manifest
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.result.contract.ActivityResultContracts
 import android.os.Handler
 import android.os.Looper
 import androidx.activity.ComponentActivity
@@ -44,6 +49,22 @@ data class PageImage(val title: String, val jpeg: ByteArray)
 
 class MainActivity : ComponentActivity() {
     private val mainHandler = Handler(Looper.getMainLooper())
+    private val backgroundServiceEnabled = mutableStateOf(false)
+    private val backgroundServiceMessage = mutableStateOf("Фоновый режим выключен.")
+
+    private fun startBackgroundConnectionService() {
+        val intent = Intent(this, BackgroundConnectionService::class.java)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(intent)
+        else startService(intent)
+        backgroundServiceEnabled.value = true
+        backgroundServiceMessage.value = "Фоновый режим активен. Android показывает постоянное уведомление."
+    }
+
+    private fun stopBackgroundConnectionService() {
+        stopService(Intent(this, BackgroundConnectionService::class.java))
+        backgroundServiceEnabled.value = false
+        backgroundServiceMessage.value = "Фоновый режим выключен."
+    }
 
     private fun requestOpenRouter(apiKey: String, requestBody: JSONObject, callback: (String?, String?) -> Unit) {
         Thread {
@@ -103,6 +124,12 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        val bluetoothPermissionRequest = registerForActivityResult(
+            ActivityResultContracts.RequestPermission()
+        ) { granted ->
+            if (granted) startBackgroundConnectionService()
+            else backgroundServiceMessage.value = "Разрешение Bluetooth не выдано. Фоновый режим не включён."
+        }
         setContent {
             val context = LocalContext.current.applicationContext
             val encryptedPrefs = remember {
@@ -243,6 +270,24 @@ class MainActivity : ComponentActivity() {
                                 status = "История диалога очищена."
                             }, modifier = Modifier.weight(1f)) { Text("Новая беседа") }
                         }
+                        OutlinedButton(
+                            onClick = {
+                                if (backgroundServiceEnabled.value) {
+                                    stopBackgroundConnectionService()
+                                } else if (
+                                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+                                    checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED
+                                ) {
+                                    bluetoothPermissionRequest.launch(Manifest.permission.BLUETOOTH_CONNECT)
+                                } else {
+                                    startBackgroundConnectionService()
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(if (backgroundServiceEnabled.value) "Выключить фоновый режим" else "Работа при выключенном экране")
+                        }
+                        Text(backgroundServiceMessage.value, style = MaterialTheme.typography.bodySmall)
                         Card(shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
                             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                 Text("Состояние", style = MaterialTheme.typography.titleMedium)
