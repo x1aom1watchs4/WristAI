@@ -52,7 +52,7 @@ export default {
     conversation: 'WristAI готов. Введи вопрос — телефон отправит его в Gemini и вернёт ответ сюда.',
     conversationLines: [], sendGlyphs: [], chatReady: false,
     query: '', queryGlyphs: [], keyboardVisible: true, keyboardLanguage: 'ru', keyboardMode: 'letters',
-    transferId: '', expectedChunks: 0, chunks: [], received: 0,
+    transferId: '', expectedChunks: 0, chunks: [], received: 0, requestPending: false,
     ruRow1: ['Й','Ц','У','К','Е','Н','Г','Ш','Щ','З','Х'],
     ruRow2: ['Ф','Ы','В','А','П','Р','О','Л','Д','Ж','Э'],
     ruRow3: ['Я','Ч','С','М','И','Т','Ь','Б','Ю','Ё','Ъ'],
@@ -97,6 +97,7 @@ export default {
     } else if (message.type === 'page_end') {
       if (message.id !== this.transferId) return
       const answer = this.chunks.join('').trim()
+      this.requestPending = false
       if (answer) {
         this.conversation = this.conversation + '\n\nИИ:\n' + answer
         this.updateConversationLines()
@@ -105,6 +106,7 @@ export default {
       this.chunks = []
       this.sendCommand('page_ack', {id: this.transferId, ok: true})
     } else if (message.type === 'transfer_error') {
+      this.requestPending = false
       this.status = message.message || 'Ошибка передачи ответа'
     }
   },
@@ -133,7 +135,7 @@ export default {
     connection.send({
       data: Object.assign({type: type}, extra || {}),
       success: () => {},
-      fail: (error, code) => { this.status = 'Не удалось отправить: ' + String(code || '') }
+      fail: (error, code) => { if (type === 'ai_prompt') this.requestPending = false; this.status = 'Не удалось отправить: ' + String(code || '') }
     })
   },
   makeGlyphs(value) {
@@ -149,8 +151,8 @@ export default {
   makeConversationLines(value) {
     const result = []
     let source = String(value || '').replace(/\r/g, '')
-    if (source.length > 1100) {
-      source = '…\n' + source.slice(-1100).replace(/^\s+/, '')
+    if (source.length > 520) {
+      source = '…\n' + source.slice(-520).replace(/^\s+/, '')
     }
     const paragraphs = source.split('\n')
     paragraphs.forEach((paragraph) => {
@@ -167,7 +169,7 @@ export default {
     return result
   },
   updateConversationLines() {
-    if (this.conversation.length > 1100) this.conversation = '…\n' + this.conversation.slice(-1100).replace(/^\s+/, '')
+    if (this.conversation.length > 3000) this.conversation = '…\n' + this.conversation.slice(-3000).replace(/^\s+/, '')
     this.conversationLines = this.makeConversationLines(this.conversation)
     this.scrollChatToBottom()
   },
@@ -186,7 +188,9 @@ export default {
   submitPrompt() {
     const prompt = String(this.query || '').trim()
     if (!prompt) return
+    if (this.requestPending) { this.status = 'Подожди завершения предыдущего ответа'; return }
     if (prompt.length > 4000) { this.status = 'Вопрос слишком длинный (максимум 4000 символов)'; return }
+    this.requestPending = true
     this.conversation = this.conversation + '\n\nТы:\n' + prompt
     this.updateConversationLines()
     this.query = ''
