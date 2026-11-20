@@ -1,9 +1,9 @@
 <template>
   <div class="page">
     <text class="brand" if="{{!keyboardVisible}}">WristBrowser</text>
-    <text class="status">{{status}}</text>
+    <div class="glyphLine status"><div class="glyphCell" for="{{item in statusGlyphs}}"><image if="{{item.image}}" class="uiGlyph" src="{{item.image}}" /><text if="{{!item.image}}" class="plainGlyph">{{item.char}}</text></div></div>
     <div class="toolbar">
-      <text class="address" @click="showKeyboard">{{query || 'Поиск или адрес сайта'}}</text>
+      <div class="glyphLine address" @click="showKeyboard"><div class="glyphCell" for="{{item in queryGlyphs}}"><image if="{{item.image}}" class="uiGlyph" src="{{item.image}}" /><text if="{{!item.image}}" class="plainGlyph">{{item.char}}</text></div></div>
       <input type="button" class="keyboardButton" value="КЛАВ" @click="showKeyboard" />
       <input type="button" class="go" value="GO" @click="submitSearch" />
     </div>
@@ -13,8 +13,8 @@
       <input type="button" class="control" value="↓ ВНИЗ" @click="sendCommand('scroll', {delta: 420})" />
       <input type="button" class="control" value="NEXT" @click="sendCommand('forward')" />
     </div>
-    <text class="heading" if="{{!keyboardVisible}}">{{pageTitle}}</text>
-    <text class="url" if="{{!keyboardVisible}}">{{pageUrl}}</text>
+    <div class="glyphLine heading" if="{{!keyboardVisible}}"><div class="glyphCell" for="{{item in titleGlyphs}}"><image if="{{item.image}}" class="uiGlyph" src="{{item.image}}" /><text if="{{!item.image}}" class="plainGlyph">{{item.char}}</text></div></div>
+    <div class="glyphLine url" if="{{!keyboardVisible}}"><div class="glyphCell" for="{{item in urlGlyphs}}"><image if="{{item.image}}" class="uiGlyph" src="{{item.image}}" /><text if="{{!item.image}}" class="plainGlyph">{{item.char}}</text></div></div>
     <div if="{{!keyboardVisible}}" class="readerArea">
       <scroll class="reader" scroll-y="true" scroll-x="false">
         <div class="imageList" if="{{pageImages.length > 0}}">
@@ -23,12 +23,12 @@
         </div>
         <text class="body" if="{{!visualPage}}">{{pageText}}</text>
         <div class="linkList">
-          <text class="link" for="{{item in pageLinks}}" @click="openLink(item)">{{item.title}}</text>
+          <div class="link glyphLine" for="{{item in pageLinks}}" @click="openLink(item)"><div class="glyphCell" for="{{glyph in item.glyphs}}"><image if="{{glyph.image}}" class="uiGlyph" src="{{glyph.image}}" /><text if="{{!glyph.image}}" class="plainGlyph">{{glyph.char}}</text></div></div>
         </div>
       </scroll>
     </div>
     <div if="{{keyboardVisible}}" class="keyboard">
-      <text class="typed">{{query}}_</text>
+      <div class="typed glyphLine"><div class="glyphCell" for="{{item in queryGlyphs}}"><image if="{{item.image}}" class="uiGlyph" src="{{item.image}}" /><text if="{{!item.image}}" class="plainGlyph">{{item.char}}</text></div><text class="plainGlyph">_</text></div>
       <text class="layoutToggle" @click="toggleKeyboardLanguage">{{keyboardLanguage === 'ru' ? 'РУС ✓  |  EN' : 'РУС  |  EN ✓'}}</text>
       <div class="keyRow" if="{{keyboardLanguage === 'en'}}">
         <text class="key" for="{{item in row1}}" @click="appendKey(item)">{{item}}</text>
@@ -99,6 +99,7 @@ let connection = null
 export default {
   private: {
     status: 'Подключаемся к телефону…',
+    statusGlyphs: [], titleGlyphs: [], urlGlyphs: [], queryGlyphs: [],
     pageTitle: 'Открой сайт в приложении на телефоне',
     pageUrl: '',
     visualPage: false,
@@ -127,8 +128,29 @@ export default {
   },
 
   onInit() {
+    this.setStatus(this.status)
+    this.setPageTitle(this.pageTitle)
+    this.setPageUrl(this.pageUrl)
+    this.setQuery(this.query)
     this.bindConnection()
   },
+
+  makeGlyphs(value) {
+    const text = String(value || '')
+    const output = []
+    for (let i = 0; i < text.length; i++) {
+      const char = text.charAt(i)
+      const code = char.charCodeAt(0)
+      output.push(code >= 0x0400 && code <= 0x04FF
+        ? {char: char, image: '/common/glyphs/u' + ('0000' + code.toString(16).toUpperCase()).slice(-4) + '.png'}
+        : {char: char, image: ''})
+    }
+    return output
+  },
+  setStatus(value) { this.status = String(value || ''); this.statusGlyphs = this.makeGlyphs(this.status) },
+  setPageTitle(value) { this.pageTitle = String(value || ''); this.titleGlyphs = this.makeGlyphs(this.pageTitle) },
+  setPageUrl(value) { this.pageUrl = String(value || ''); this.urlGlyphs = this.makeGlyphs(this.pageUrl) },
+  setQuery(value) { this.query = String(value || ''); this.queryGlyphs = this.makeGlyphs(this.query || 'Поиск или адрес сайта') },
 
   bindConnection() {
     connection = interconnect.instance()
@@ -187,7 +209,7 @@ export default {
         this.visualPage = pageContent.indexOf('__WRIST_VISUAL_PAGE__') === 0
         this.pageText = this.visualPage ? '' : pageContent
         try {
-          this.pageLinks = JSON.parse(content.slice(markerIndex + marker.length)) || []
+          this.pageLinks = (JSON.parse(content.slice(markerIndex + marker.length)) || []).map((item) => Object.assign({}, item, {glyphs: this.makeGlyphs(item.title || '')}))
         } catch (error) {
           this.pageLinks = []
         }
@@ -396,6 +418,20 @@ export default {
 .pageImage { width: 380px; height: 236px; object-fit: contain; margin-bottom: 8px; }
 .linkList { width: 410px; flex-direction: column; margin-top: 8px; }
 .link { width: 405px; color: #8ed6c5; font-size: 15px; padding: 8px 4px; border-bottom: 1px solid #344653; }
+.glyphLine { flex-direction: row; flex-wrap: wrap; align-items: center; }
+.glyphCell { flex-direction: row; align-items: center; }
+.uiGlyph { width: 14px; height: 17px; object-fit: contain; }
+.plainGlyph { color: #ffffff; font-size: 14px; }
+.status .plainGlyph { color: #8ed6c5; font-size: 13px; }
+.heading .uiGlyph { width: 17px; height: 20px; }
+.heading .plainGlyph { font-size: 18px; font-weight: bold; }
+.url .uiGlyph { width: 10px; height: 12px; }
+.url .plainGlyph { color: #91a1ad; font-size: 10px; }
+.address .plainGlyph { font-size: 14px; }
+.link .uiGlyph { width: 14px; height: 17px; }
+.link .plainGlyph { color: #8ed6c5; font-size: 15px; }
+.typed .uiGlyph { width: 16px; height: 19px; }
+.typed .plainGlyph { color: #ffffff; font-size: 16px; }
 .hint { width: 420px; color: #8797a3; font-size: 10px; text-align: center; margin-top: 5px; }
 .keyboard { width: 430px; height: 330px; flex-direction: column; align-items: center; justify-content: flex-start; }
 .keyRow { width: 430px; height: 43px; flex-direction: row; justify-content: center; align-items: center; margin-bottom: 4px; }
