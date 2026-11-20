@@ -142,8 +142,8 @@ export default {
   makeConversationLines(value) {
     const result = []
     let source = String(value || '').replace(/\r/g, '')
-    if (source.length > 1200) {
-      source = '…\n' + source.slice(-1200).replace(/^\s+/, '')
+    if (source.length > 1100) {
+      source = '…\n' + source.slice(-1100).replace(/^\s+/, '')
     }
     const paragraphs = source.split('\n')
     paragraphs.forEach((paragraph) => {
