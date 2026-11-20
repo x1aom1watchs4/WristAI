@@ -110,6 +110,10 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y python3-pil fonts-dejavu-core
           python3 watch/scripts/generate_keyboard_glyphs.py
+          test "$(find watch/src/common/keyboard -maxdepth 1 -name 'u*.png' | wc -l)" -eq 66
+          test "$(find watch/src/common/glyphs -maxdepth 1 -name 'u*.png' | wc -l)" -eq 66
+          test -s watch/src/common/keyboard/u0419.png
+          test -s watch/src/common/glyphs/u044F.png
       - name: Install Vela dependencies
         working-directory: watch
         run: npm install --no-audit --no-fund
