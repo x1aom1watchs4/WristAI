@@ -163,7 +163,7 @@ export default {
     connection = interconnect.instance()
     connection.onopen = () => { this.setStatus('Телефон подключён') }
     connection.onclose = () => { this.setStatus('Связь с телефоном прервана') }
-    connection.onerror = (event) => { this.setStatus('Ошибка связи: ' + String(event && event.code || '') })
+    connection.onerror = (event) => { this.setStatus('Ошибка связи: ' + String(event && event.code || '')) }
     connection.onmessage = (event) => {
       const raw = event && event.data !== undefined ? event.data : ''
       this.handleMessage(raw)
