@@ -161,8 +161,8 @@ export default {
 
   bindConnection() {
     connection = interconnect.instance()
-    connection.onopen = () => { this.setStatus('Телефон подключён' })
-    connection.onclose = () => { this.setStatus('Связь с телефоном прервана' })
+    connection.onopen = () => { this.setStatus('Телефон подключён') }
+    connection.onclose = () => { this.setStatus('Связь с телефоном прервана') }
     connection.onerror = (event) => { this.setStatus('Ошибка связи: ' + String(event && event.code || '') })
     connection.onmessage = (event) => {
       const raw = event && event.data !== undefined ? event.data : ''
@@ -172,7 +172,7 @@ export default {
       success: (result) => {
         this.setStatus(result && result.status === 1 ? 'Телефон подключён' : 'Ожидаем приложение на телефоне…')
       },
-      fail: () => { this.setStatus('Ожидаем соединение с телефоном…' })
+      fail: () => { this.setStatus('Ожидаем соединение с телефоном…') }
     })
   },
 
@@ -381,8 +381,8 @@ export default {
   },
   showKeyboard() { this.typingIntoPage = false; this.keyboardVisible = true },
   hideKeyboard() { this.keyboardVisible = false; this.typingIntoPage = false },
-  appendKey(key) { this.setQuery(String(this.query || '') + String(key || '') },)
-  deleteKey() { this.setQuery(String(this.query || '').slice(0, -1) },)
+  appendKey(key) { this.setQuery(String(this.query || '') + String(key || '')) }
+  deleteKey() { this.setQuery(String(this.query || '').slice(0, -1)) }
   submitSearch() {
     const value = String(this.query || '').trim()
     if (!value) return
