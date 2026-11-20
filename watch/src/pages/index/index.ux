@@ -2,16 +2,14 @@
   <div class="page">
     <text class="brand">WristAI</text>
     <text class="status">{{status}}</text>
-    <scroll class="chat" if="{{!keyboardVisible}}" scroll-y="true" scroll-x="false" scroll-top="{{chatScrollTop}}">
-      <div class="conversation">
-        <div class="conversationLine" for="{{line in conversationLines}}">
-          <div class="conversationGlyph" for="{{item in line}}">
-            <image if="{{item.image}}" class="conversationImage" src="{{item.image}}" />
-            <text if="{{!item.image}}" class="conversationPlain">{{item.char}}</text>
-          </div>
+    <list id="chatList" class="chat" if="{{!keyboardVisible}}" bounces="true">
+      <list-item class="conversationLine" for="{{line in conversationLines}}">
+        <div class="conversationGlyph" for="{{item in line}}">
+          <image if="{{item.image}}" class="conversationImage" src="{{item.image}}" />
+          <text if="{{!item.image}}" class="conversationPlain">{{item.char}}</text>
         </div>
-      </div>
-    </scroll>
+      </list-item>
+    </list>
     <div class="composer" @click="showKeyboard"><text class="prompt">{{query || 'Нажми, чтобы задать вопрос ИИ'}}</text></div>
     <div class="actions" if="{{!keyboardVisible}}">
       <div class="send" @click="submitPrompt">
@@ -48,7 +46,7 @@ export default {
   private: {
     status: 'Подключаемся к телефону…',
     conversation: 'WristAI готов. Введи вопрос — телефон отправит его в Gemini и вернёт ответ сюда.',
-    conversationLines: [], sendGlyphs: [], chatScrollTop: 0,
+    conversationLines: [], sendGlyphs: [], chatReady: false,
     query: '', queryGlyphs: [], keyboardVisible: true, keyboardLanguage: 'ru',
     transferId: '', expectedChunks: 0, chunks: [], received: 0,
     ruRow1: ['Й','Ц','У','К','Е','Н','Г','Ш','Щ','З','Х'],
@@ -59,6 +57,7 @@ export default {
     row3: ['Z','X','C','V','B','N','M']
   },
   onInit() { this.updateQueryGlyphs(); this.sendGlyphs = this.makeGlyphs('ОТПРАВИТЬ'); this.updateConversationLines(); this.bindConnection() },
+  onReady() { this.chatReady = true; this.scrollChatToBottom() },
   bindConnection() {
     connection = interconnect.instance()
     connection.onopen = () => { this.status = 'Телефон подключён' }
@@ -158,7 +157,12 @@ export default {
   },
   updateConversationLines() {
     this.conversationLines = this.makeConversationLines(this.conversation)
-    this.chatScrollTop = this.chatScrollTop + 100000
+    this.scrollChatToBottom()
+  },
+  scrollChatToBottom() {
+    if (!this.chatReady || !this.conversationLines.length) return
+    const chat = this.$element('chatList')
+    if (chat && chat.scrollTo) chat.scrollTo({index: this.conversationLines.length - 1, behavior: 'smooth'})
   },
   showKeyboard() { this.keyboardVisible = true },
   hideKeyboard() { this.keyboardVisible = false },
@@ -184,7 +188,6 @@ export default {
 .brand { color:#ffffff; font-size:28px; font-weight:bold; margin-bottom:2px; }
 .status { color:#9eb2c4; font-size:14px; height:22px; }
 .chat { width:100%; height:230px; min-height:230px; flex-shrink:0; margin-top:8px; margin-bottom:8px; background-color:#182633; border-radius:14px; padding:12px; box-sizing:border-box; }
-.conversation { width:100%; flex-direction:column; align-items:flex-start; }
 .conversationLine { width:100%; height:22px; min-height:22px; flex-direction:row; align-items:center; flex-shrink:0; }
 .conversationGlyph { width:14px; height:22px; flex-direction:row; align-items:center; justify-content:center; flex-shrink:0; }
 .conversationImage { width:14px; height:18px; }
