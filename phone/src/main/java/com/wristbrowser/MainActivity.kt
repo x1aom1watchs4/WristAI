@@ -1,6 +1,8 @@
 package com.wristbrowser
 
 import android.os.Bundle
+import android.app.Activity
+import android.speech.RecognizerIntent
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -10,6 +12,7 @@ import android.os.Handler
 import android.os.Looper
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Box
@@ -165,6 +168,65 @@ class MainActivity : ComponentActivity() {
             var status by remember { mutableStateOf("Подключаемся к часам…") }
             var busy by remember { mutableStateOf(false) }
             var history by remember { mutableStateOf(listOf<Pair<String, String>>()) }
+            var promptDraft by remember { mutableStateOf("") }
+
+            fun submitPrompt(rawPrompt: String) {
+                val prompt = rawPrompt.trim().take(2500)
+                when {
+                    prompt.isBlank() -> status = "Сначала скажи или введи вопрос."
+                    apiKey.isBlank() -> status = "Сначала введи OpenRouter API key в приложении."
+                    busy -> status = "ИИ уже готовит ответ. Подожди завершения."
+                    else -> {
+                        busy = true
+                        val modelName = chatModels.firstOrNull { it.first == selectedModelId }?.second ?: selectedModelId
+                        status = "$modelName обрабатывает вопрос…"
+                        val messages = JSONArray()
+                        history.takeLast(4).forEach { turn ->
+                            messages.put(JSONObject()
+                                .put("role", if (turn.first == "model") "assistant" else turn.first)
+                                .put("content", turn.second))
+                        }
+                        messages.put(JSONObject().put("role", "user").put("content", prompt))
+                        val requestBody = JSONObject()
+                            .put("model", selectedModelId)
+                            .put("messages", messages)
+                            .put("max_tokens", 450)
+                        requestOpenRouter(apiKey.trim(), requestBody) { answer, error ->
+                            busy = false
+                            if (answer == null) {
+                                val message = "Ошибка OpenRouter / $modelName: " + (error ?: "неизвестная ошибка")
+                                status = message
+                                bridge.send(WebPage("wristai://reply", "WristAI", message), emptyList()) { result -> status = result }
+                            } else {
+                                history = (history + listOf("user" to prompt.take(600), "model" to answer.take(1000))).takeLast(4)
+                                promptDraft = ""
+                                status = "Ответ получен. Передаём на часы…"
+                                bridge.send(WebPage("wristai://reply", "WristAI", answer), emptyList()) { result -> status = result }
+                            }
+                        }
+                    }
+                }
+            }
+
+            val speechRecognizerLauncher = rememberLauncherForActivityResult(
+                ActivityResultContracts.StartActivityForResult()
+            ) { result ->
+                if (result.resultCode == Activity.RESULT_OK) {
+                    val recognized = result.data
+                        ?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
+                        ?.firstOrNull()
+                        ?.trim()
+                        .orEmpty()
+                    if (recognized.isNotBlank()) {
+                        promptDraft = recognized
+                        status = "Речь распознана. Проверь текст и нажми «Отправить в ИИ»."
+                    } else {
+                        status = "Не удалось распознать речь. Попробуй ещё раз."
+                    }
+                } else {
+                    status = "Голосовой ввод отменён."
+                }
+            }
 
             LaunchedEffect(Unit) {
                 bridge.setCommandListener { raw ->
@@ -172,43 +234,7 @@ class MainActivity : ComponentActivity() {
                         try {
                             val command = JSONObject(raw)
                             if (command.optString("type") != "ai_prompt") return@runOnUiThread
-                            val prompt = command.optString("prompt").trim().take(2500)
-                            when {
-                                prompt.isBlank() -> status = "Получен пустой вопрос."
-                                apiKey.isBlank() -> {
-                                    status = "Введи OpenRouter API key в этом приложении."
-                                    bridge.send(WebPage("wristai://reply", "WristAI", "Сначала введи OpenRouter API key в приложении на телефоне."), emptyList()) { result -> status = result }
-                                }
-                                busy -> status = "ИИ уже готовит ответ. Подожди завершения."
-                                else -> {
-                                    busy = true
-                                    val modelName = chatModels.firstOrNull { it.first == selectedModelId }?.second ?: selectedModelId
-                                    status = "$modelName обрабатывает вопрос…"
-                                    val messages = JSONArray()
-                                    history.takeLast(4).forEach { turn ->
-                                        messages.put(JSONObject()
-                                            .put("role", if (turn.first == "model") "assistant" else turn.first)
-                                            .put("content", turn.second))
-                                    }
-                                    messages.put(JSONObject().put("role", "user").put("content", prompt))
-                                    val requestBody = JSONObject()
-                                        .put("model", selectedModelId)
-                                        .put("messages", messages)
-                                        .put("max_tokens", 450)
-                                    requestOpenRouter(apiKey.trim(), requestBody) { answer, error ->
-                                        busy = false
-                                        if (answer == null) {
-                                            val message = "Ошибка OpenRouter / $modelName: " + (error ?: "неизвестная ошибка")
-                                            status = message
-                                            bridge.send(WebPage("wristai://reply", "WristAI", message), emptyList()) { result -> status = result }
-                                        } else {
-                                            history = (history + listOf("user" to prompt.take(600), "model" to answer.take(1000))).takeLast(4)
-                                            status = "Ответ получен. Передаём на часы…"
-                                            bridge.send(WebPage("wristai://reply", "WristAI", answer), emptyList()) { result -> status = result }
-                                        }
-                                    }
-                                }
-                            }
+                            submitPrompt(command.optString("prompt"))
                         } catch (error: Exception) {
                             status = "Ошибка обработки сообщения: " + (error.message ?: "unknown")
                         }
@@ -245,6 +271,42 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                         Text("Seedance 2.5 Flash — отдельная модель генерации видео, она не используется для текстовых ответов.", style = MaterialTheme.typography.bodySmall)
+                        OutlinedTextField(
+                            value = promptDraft,
+                            onValueChange = { promptDraft = it },
+                            label = { Text("Вопрос для ИИ") },
+                            placeholder = { Text("Скажи или напиши вопрос…") },
+                            modifier = Modifier.fillMaxWidth(),
+                            minLines = 2,
+                            maxLines = 4
+                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedButton(
+                                onClick = {
+                                    val speechIntent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                                        putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                                        putExtra(RecognizerIntent.EXTRA_LANGUAGE, java.util.Locale.getDefault().toLanguageTag())
+                                        putExtra(RecognizerIntent.EXTRA_PROMPT, "Скажите вопрос для WristAI")
+                                    }
+                                    try {
+                                        speechRecognizerLauncher.launch(speechIntent)
+                                        status = "Открылось системное распознавание речи…"
+                                    } catch (_: Exception) {
+                                        status = "На телефоне нет доступного системного распознавания речи."
+                                    }
+                                },
+                                modifier = Modifier.weight(1f)
+                            ) { Text("🎙 Голосовой ввод") }
+                            Button(
+                                onClick = { submitPrompt(promptDraft) },
+                                enabled = promptDraft.isNotBlank() && !busy,
+                                modifier = Modifier.weight(1f)
+                            ) { Text("Отправить в ИИ") }
+                        }
+                        Text(
+                            "Голос распознаётся системной службой Android. WristAI не записывает и не сохраняет аудио; перед отправкой можно проверить распознанный текст.",
+                            style = MaterialTheme.typography.bodySmall
+                        )
                         OutlinedTextField(
                             value = apiKey, onValueChange = {
                                 apiKey = it
