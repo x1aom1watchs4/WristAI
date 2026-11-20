@@ -127,6 +127,7 @@ class MainActivity : ComponentActivity() {
                 "google/gemma-4-26b-a4b-it:free" to "Gemma 4 26B A4B (Free)",
                 "qwen/qwen4-max" to "Qwen4 Max",
                 "mistralai/pixtral-large-2502" to "Pixtral Large 2502",
+                "nvidia/nemotron-3-ultra-550b-a55b:free" to "NVIDIA Nemotron 3 Ultra (Free)",
                 "openai/gpt-6.2-astra-pro" to "GPT-6.2 Astra Pro"
             )
             var selectedModelId by remember {
