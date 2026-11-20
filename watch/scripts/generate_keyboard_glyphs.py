@@ -2,18 +2,23 @@
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 
-OUT = Path(__file__).resolve().parents[1] / "src" / "common" / "glyphs"
-OUT.mkdir(parents=True, exist_ok=True)
+ROOT = Path(__file__).resolve().parents[1] / "src" / "common"
 FONT = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
-font = ImageFont.truetype(FONT, 22)
 letters = "АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯабвгдеёжзийклмнопрстуфхцчшщъыьэюя"
-for char in letters:
-    image = Image.new("RGBA", (28, 28), (0, 0, 0, 0))
-    draw = ImageDraw.Draw(image)
-    bounds = draw.textbbox((0, 0), char, font=font, stroke_width=0)
-    width, height = bounds[2] - bounds[0], bounds[3] - bounds[1]
-    x = (28 - width) / 2 - bounds[0]
-    y = (28 - height) / 2 - bounds[1] - 1
-    draw.text((round(x), round(y)), char, font=font, fill=(255, 255, 255, 255))
-    image.save(OUT / ("u%04X.png" % ord(char)), optimize=True)
-print("Generated %d Cyrillic keyboard glyphs in %s" % (len(letters), OUT))
+
+def render(out, size, font_size):
+    out.mkdir(parents=True, exist_ok=True)
+    font = ImageFont.truetype(FONT, font_size)
+    for char in letters:
+        image = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(image)
+        bounds = draw.textbbox((0, 0), char, font=font)
+        width, height = bounds[2] - bounds[0], bounds[3] - bounds[1]
+        x = (size - width) / 2 - bounds[0]
+        y = (size - height) / 2 - bounds[1] - 1
+        draw.text((round(x), round(y)), char, font=font, fill=(255, 255, 255, 255))
+        image.save(out / ("u%04X.png" % ord(char)), optimize=True)
+
+render(ROOT / "keyboard", 34, 25)
+render(ROOT / "glyphs", 28, 22)
+print("Generated keyboard and UI glyphs for %d Cyrillic characters" % len(letters))
