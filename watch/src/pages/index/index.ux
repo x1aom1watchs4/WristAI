@@ -333,7 +333,7 @@ export default {
     connection.send({
       data: data,
       success: () => {},
-      fail: (error, code) => { this.setStatus('Не удалось отправить команду: ' + String(code || '') })
+      fail: (error, code) => { this.setStatus('Не удалось отправить команду: ' + String(code || '')) },
     })
   },
 
