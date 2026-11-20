@@ -141,7 +141,11 @@ export default {
   updateQueryGlyphs() { this.queryGlyphs = this.makeGlyphs(this.query) },
   makeConversationLines(value) {
     const result = []
-    const paragraphs = String(value || '').replace(/\r/g, '').split('\n')
+    let source = String(value || '').replace(/\r/g, '')
+    if (source.length > 1200) {
+      source = '…\n' + source.slice(-1200).replace(/^\s+/, '')
+    }
+    const paragraphs = source.split('\n')
     paragraphs.forEach((paragraph) => {
       let rest = paragraph
       if (!rest) { result.push([]); return }
