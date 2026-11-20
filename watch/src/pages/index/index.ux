@@ -2,7 +2,7 @@
   <div class="page">
     <text class="brand">WristAI</text>
     <text class="status">{{status}}</text>
-    <scroll class="chat" if="{{!keyboardVisible}}" scroll-y="true" scroll-x="false">
+    <scroll class="chat" if="{{!keyboardVisible}}" scroll-y="true" scroll-x="false" scroll-top="{{chatScrollTop}}">
       <div class="conversation">
         <div class="conversationLine" for="{{line in conversationLines}}">
           <div class="conversationGlyph" for="{{item in line}}">
@@ -14,7 +14,12 @@
     </scroll>
     <div class="composer" @click="showKeyboard"><text class="prompt">{{query || 'Нажми, чтобы задать вопрос ИИ'}}</text></div>
     <div class="actions" if="{{!keyboardVisible}}">
-      <text class="send" @click="submitPrompt">ОТПРАВИТЬ</text>
+      <div class="send" @click="submitPrompt">
+        <div class="sendGlyph" for="{{item in sendGlyphs}}">
+          <image if="{{item.image}}" class="sendImage" src="{{item.image}}" />
+          <text if="{{!item.image}}" class="sendPlain">{{item.char}}</text>
+        </div>
+      </div>
       <text class="clear" @click="clearInput">ОЧИСТИТЬ</text>
     </div>
     <div class="keyboard" if="{{keyboardVisible}}">
@@ -32,7 +37,7 @@
         <text class="key special" @click="appendKey('?')">?</text>
         <text class="key special" @click="toggleKeyboardLanguage">{{keyboardLanguage === 'ru' ? 'EN' : 'РУС'}}</text>
       </div>
-      <div class="keyRow"><text class="key special" @click="hideKeyboard">ГОТОВО</text><text class="key special" @click="submitPrompt">ОТПРАВИТЬ</text></div>
+      <div class="keyRow"><text class="key special" @click="hideKeyboard">ГОТОВО</text><div class="key special sendKey" @click="submitPrompt"><div class="sendGlyph" for="{{item in sendGlyphs}}"><image if="{{item.image}}" class="sendKeyImage" src="{{item.image}}" /><text if="{{!item.image}}" class="sendPlain">{{item.char}}</text></div></div></div>
     </div>
   </div>
 </template>
@@ -43,7 +48,7 @@ export default {
   private: {
     status: 'Подключаемся к телефону…',
     conversation: 'WristAI готов. Введи вопрос — телефон отправит его в Gemini и вернёт ответ сюда.',
-    conversationLines: [],
+    conversationLines: [], sendGlyphs: [], chatScrollTop: 0,
     query: '', queryGlyphs: [], keyboardVisible: true, keyboardLanguage: 'ru',
     transferId: '', expectedChunks: 0, chunks: [], received: 0,
     ruRow1: ['Й','Ц','У','К','Е','Н','Г','Ш','Щ','З','Х'],
@@ -53,7 +58,7 @@ export default {
     row2: ['A','S','D','F','G','H','J','K','L'],
     row3: ['Z','X','C','V','B','N','M']
   },
-  onInit() { this.updateQueryGlyphs(); this.updateConversationLines(); this.bindConnection() },
+  onInit() { this.updateQueryGlyphs(); this.sendGlyphs = this.makeGlyphs('ОТПРАВИТЬ'); this.updateConversationLines(); this.bindConnection() },
   bindConnection() {
     connection = interconnect.instance()
     connection.onopen = () => { this.status = 'Телефон подключён' }
@@ -151,7 +156,10 @@ export default {
     })
     return result
   },
-  updateConversationLines() { this.conversationLines = this.makeConversationLines(this.conversation) },
+  updateConversationLines() {
+    this.conversationLines = this.makeConversationLines(this.conversation)
+    this.chatScrollTop = this.chatScrollTop + 100000
+  },
   showKeyboard() { this.keyboardVisible = true },
   hideKeyboard() { this.keyboardVisible = false },
   appendKey(key) { this.query = String(this.query || '') + String(key || ''); this.updateQueryGlyphs() },
@@ -175,16 +183,21 @@ export default {
 .page { width:466px; height:466px; padding:14px 18px 12px; box-sizing:border-box; flex-direction:column; background-color:#101820; align-items:center; }
 .brand { color:#ffffff; font-size:28px; font-weight:bold; margin-bottom:2px; }
 .status { color:#9eb2c4; font-size:14px; height:22px; }
-.chat { width:100%; height:230px; margin-top:8px; margin-bottom:8px; background-color:#182633; border-radius:14px; padding:12px; box-sizing:border-box; }
+.chat { width:100%; height:230px; min-height:230px; flex-shrink:0; margin-top:8px; margin-bottom:8px; background-color:#182633; border-radius:14px; padding:12px; box-sizing:border-box; }
 .conversation { width:100%; flex-direction:column; align-items:flex-start; }
-.conversationLine { width:100%; min-height:22px; flex-direction:row; align-items:center; }
+.conversationLine { width:100%; height:22px; min-height:22px; flex-direction:row; align-items:center; flex-shrink:0; }
 .conversationGlyph { width:14px; height:22px; flex-direction:row; align-items:center; justify-content:center; flex-shrink:0; }
 .conversationImage { width:14px; height:18px; }
 .conversationPlain { color:#f1f5f9; font-size:15px; text-align:center; }
 .composer { width:100%; min-height:42px; background-color:#263746; border-radius:12px; padding:10px; box-sizing:border-box; }
 .prompt { color:#ffffff; font-size:17px; }
 .actions { width:100%; flex-direction:row; justify-content:space-between; margin-top:7px; }
-.send { color:#071b26; background-color:#70d6bd; font-size:17px; font-weight:bold; padding:9px 20px; border-radius:12px; }
+.send { min-width:150px; height:42px; flex-direction:row; align-items:center; justify-content:center; background-color:#70d6bd; padding:0px 12px; border-radius:12px; }
+.sendGlyph { width:14px; height:22px; flex-direction:row; align-items:center; justify-content:center; flex-shrink:0; }
+.sendImage { width:14px; height:18px; }
+.sendPlain { color:#071b26; font-size:16px; font-weight:bold; }
+.sendKey { width:126px; flex-direction:row; align-items:center; justify-content:center; }
+.sendKeyImage { width:11px; height:15px; }
 .clear { color:#d7e1e8; font-size:16px; padding:9px 12px; }
 .keyboard { width:100%; margin-top:4px; background-color:#182633; padding:7px 4px; border-radius:14px; flex-direction:column; flex:1; justify-content:space-around; }
 .typed { width:100%; height:36px; flex-direction:row; align-items:center; padding:3px 6px; background-color:#263746; border-radius:8px; }
