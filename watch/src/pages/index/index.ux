@@ -2,7 +2,7 @@
   <div class="page">
     <text class="brand">WristAI</text>
     <text class="status">{{status}}</text>
-    <scroll class="chat" scroll-y="true" scroll-x="false">
+    <scroll class="chat" if="{{!keyboardVisible}}" scroll-y="true" scroll-x="false">
       <text class="conversation">{{conversation}}</text>
     </scroll>
     <div class="composer" @click="showKeyboard"><text class="prompt">{{query || 'Нажми, чтобы задать вопрос ИИ'}}</text></div>
