@@ -1,0 +1,47 @@
+<template>
+  <div class="page">
+    <text class="title">Проверка русского шрифта</text>
+    <text class="hint">Тест системного текстового рендерера Xiaomi Vela</text>
+    <text class="sample">АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ</text>
+    <text class="sample lower">абвгдеёжзийклмнопрстуфхцчшщъыьэюя</text>
+    <text class="sample mixed">Привет, WristAI! Проверка: 12345</text>
+    <text class="sample mixed">Съешь ещё этих мягких французских булок.</text>
+    <text class="hint">Если вместо букв видны квадраты — системный шрифт не подходит.</text>
+  </div>
+</template>
+<style>
+.page {
+  width: 466px;
+  height: 466px;
+  padding: 34px 30px;
+  box-sizing: border-box;
+  flex-direction: column;
+  justify-content: center;
+  background-color: #101820;
+}
+.title {
+  color: #ffffff;
+  font-size: 26px;
+  font-weight: bold;
+  text-align: center;
+  margin-bottom: 16px;
+}
+.hint {
+  color: #9eb2c4;
+  font-size: 15px;
+  text-align: center;
+  margin-bottom: 14px;
+}
+.sample {
+  color: #ffffff;
+  font-size: 17px;
+  text-align: center;
+  margin-bottom: 12px;
+}
+.lower {
+  font-size: 16px;
+}
+.mixed {
+  font-size: 18px;
+}
+</style>
