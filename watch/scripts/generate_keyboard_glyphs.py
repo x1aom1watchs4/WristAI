@@ -17,7 +17,8 @@ def render(out, size, font_size):
         x = (size - width) / 2 - bounds[0]
         y = (size - height) / 2 - bounds[1] - 1
         draw.text((round(x), round(y)), char, font=font, fill=(255, 255, 255, 255))
-        image.save(out / ("u%04X.png" % ord(char)), optimize=True)
+        # Glyphs are white with transparency, so grayscale+alpha stores the exact same pixels with fewer channels.
+        image.convert("LA").save(out / ("u%04X.png" % ord(char)), optimize=True, compress_level=9)
 
 render(ROOT / "keyboard", 34, 25)
 render(ROOT / "glyphs", 28, 22)
