@@ -1,19 +1,33 @@
 <template>
   <div class="page">
-    <text class="title">Проверка русского шрифта</text>
-    <text class="hint">Тест системного текстового рендерера Xiaomi Vela</text>
-    <text class="sample">АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ</text>
-    <text class="sample lower">абвгдеёжзийклмнопрстуфхцчшщъыьэюя</text>
-    <text class="sample mixed">Привет, WristAI! Проверка: 12345</text>
-    <text class="sample mixed">Съешь ещё этих мягких французских булок.</text>
-    <text class="hint">Если вместо букв видны квадраты — системный шрифт не подходит.</text>
+    <text class="title">ТЕСТ РУССКОГО ЯЗЫКА</text>
+    <text class="hint">Xiaomi Vela • системный шрифт</text>
+
+    <text class="label">ЗАГЛАВНЫЕ БУКВЫ</text>
+    <text class="alphabet">АБВГДЕЁЖЗИЙКЛМНОП</text>
+    <text class="alphabet">РСТУФХЦЧШЩЪЫЬЭЮЯ</text>
+
+    <text class="label">СТРОЧНЫЕ БУКВЫ</text>
+    <text class="alphabet lower">абвгдеёжзийклмноп</text>
+    <text class="alphabet lower">рстуфхцчшщъыьэюя</text>
+
+    <text class="label">ТЕКСТ, ЧИСЛА И ЗНАКИ</text>
+    <text class="sample">Привет! Это WristAI. Ёжик съел ещё яблоко.</text>
+    <text class="sample">Съешь ещё этих мягких французских булок.</text>
+    <text class="sample">№ 12345 • 12:34 • +−=!?.,:;() «»</text>
+
+    <text class="label">РАЗНЫЕ РАЗМЕРЫ</text>
+    <text class="sizeSmall">Маленький текст: русский язык</text>
+    <text class="sizeLarge">Кириллица  Ёё  Жж  Щщ</text>
+
+    <text class="footer">Если буквы видны правильно — сделай снимок экрана</text>
   </div>
 </template>
 <style>
 .page {
   width: 466px;
   height: 466px;
-  padding: 34px 30px;
+  padding: 18px 24px;
   box-sizing: border-box;
   flex-direction: column;
   justify-content: center;
@@ -21,27 +35,55 @@
 }
 .title {
   color: #ffffff;
-  font-size: 26px;
+  font-size: 23px;
   font-weight: bold;
   text-align: center;
-  margin-bottom: 16px;
+  margin-bottom: 4px;
 }
 .hint {
   color: #9eb2c4;
-  font-size: 15px;
-  text-align: center;
-  margin-bottom: 14px;
-}
-.sample {
-  color: #ffffff;
-  font-size: 17px;
+  font-size: 14px;
   text-align: center;
   margin-bottom: 12px;
 }
-.lower {
-  font-size: 16px;
+.label {
+  color: #70d6bd;
+  font-size: 13px;
+  font-weight: bold;
+  margin-top: 5px;
+  margin-bottom: 3px;
 }
-.mixed {
-  font-size: 18px;
+.alphabet {
+  color: #ffffff;
+  font-size: 17px;
+  text-align: center;
+  margin-bottom: 1px;
+}
+.lower {
+  font-weight: normal;
+}
+.sample {
+  color: #ffffff;
+  font-size: 15px;
+  text-align: center;
+  margin-bottom: 3px;
+}
+.sizeSmall {
+  color: #d7e1e8;
+  font-size: 12px;
+  text-align: center;
+}
+.sizeLarge {
+  color: #ffffff;
+  font-size: 21px;
+  font-weight: bold;
+  text-align: center;
+  margin-top: 2px;
+}
+.footer {
+  color: #9eb2c4;
+  font-size: 12px;
+  text-align: center;
+  margin-top: 9px;
 }
 </style>
