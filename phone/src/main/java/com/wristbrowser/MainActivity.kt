@@ -139,7 +139,7 @@ class MainActivity : ComponentActivity() {
                     else -> ""
                 }
                 if (answer.isBlank()) throw IllegalStateException("OpenRouter вернул пустой ответ")
-                mainHandler.post { callback(answer.take(6000), null) }
+                mainHandler.post { callback(answer.take(1200), null) }
             } catch (error: Exception) {
                 mainHandler.post { callback(null, error.message ?: "Не удалось связаться с OpenRouter") }
             } finally {
@@ -229,7 +229,7 @@ class MainActivity : ComponentActivity() {
                         val requestBody = JSONObject()
                             .put("model", selectedModelId)
                             .put("messages", messages)
-                            .put("max_tokens", 1200)
+                            .put("max_tokens", 300)
                         requestOpenRouter(apiKey.trim(), requestBody) { answer, error ->
                             busy = false
                             if (answer == null) {
