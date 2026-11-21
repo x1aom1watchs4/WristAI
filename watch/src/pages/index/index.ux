@@ -93,7 +93,9 @@ export default {
       if (index < 0 || index >= this.expectedChunks) return
       this.chunks[index] = this.base64ToUtf8(message.textBase64 || '')
       this.received++
-      this.status = 'Получаем ответ: ' + this.received + '/' + this.expectedChunks
+      if (this.received % 4 === 0 || this.received === this.expectedChunks) {
+        this.status = 'Получаем ответ: ' + this.received + '/' + this.expectedChunks
+      }
     } else if (message.type === 'page_end') {
       if (message.id !== this.transferId) return
       const answer = this.chunks.join('').trim()
