@@ -49,7 +49,7 @@ export default {
     status: 'Подключаемся к телефону…',
     conversation: 'WristAI готов. Введи вопрос — телефон отправит его в Gemini и вернёт ответ сюда.',
     conversationLines: [], sendGlyphs: [], chatReady: false,
-    query: '', queryGlyphs: [], keyboardVisible: true, keyboardLanguage: 'ru', keyboardMode: 'letters',
+    query: '', queryGlyphs: [], keyboardVisible: false, keyboardLanguage: 'ru', keyboardMode: 'letters',
     transferId: '', expectedChunks: 0, chunks: [], receivedChunks: [], received: 0, requestPending: false,
     ruRow1: ['Й','Ц','У','К','Е','Н','Г','Ш','Щ','З','Х'],
     ruRow2: ['Ф','Ы','В','А','П','Р','О','Л','Д','Ж','Э'],
