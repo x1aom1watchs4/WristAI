@@ -151,9 +151,6 @@ export default {
   makeConversationLines(value) {
     const result = []
     let source = String(value || '').replace(/\r/g, '')
-    if (source.length > 180) {
-      source = '…\n' + source.slice(-180).replace(/^\s+/, '')
-    }
     const paragraphs = source.split('\n')
     paragraphs.forEach((paragraph) => {
       let rest = paragraph
@@ -169,14 +166,13 @@ export default {
     return result
   },
   updateConversationLines() {
-    if (this.conversation.length > 1000) this.conversation = '…\n' + this.conversation.slice(-1000).replace(/^\s+/, '')
     this.conversationLines = this.makeConversationLines(this.conversation)
     this.scrollChatToBottom()
   },
   scrollChatToBottom() {
     if (!this.chatReady || !this.conversationLines.length) return
     const chat = this.$element('chatList')
-    if (chat && chat.scrollTo) chat.scrollTo({index: this.conversationLines.length - 1, behavior: 'smooth'})
+    if (chat && chat.scrollTo) chat.scrollTo({index: this.conversationLines.length - 1})
   },
   showKeyboard() { this.keyboardVisible = true },
   hideKeyboard() { this.keyboardVisible = false },
