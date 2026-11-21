@@ -180,26 +180,28 @@ export default {
   },
   updateQueryGlyphs() { this.queryGlyphs = this.makeGlyphs(this.query) },
   makeConversationLines(value) {
-    const result = []
-    let source = String(value || '').replace(/\r/g, '')
+    // Bound rendered nodes: each Cyrillic glyph creates a separate image element.
+    // Keep the full conversation string; cap only the watch's rendered scrollback.
+    const maxVisibleLines = 96
+    const lines = []
+    const pushLine = (line) => {
+      if (lines.length >= maxVisibleLines) lines.shift()
+      lines.push(line)
+    }
+    const source = String(value || '').replace(/\r/g, '')
     const paragraphs = source.split('\n')
     paragraphs.forEach((paragraph) => {
       let rest = paragraph
-      if (!rest) { result.push([]); return }
+      if (!rest) { pushLine(''); return }
       while (rest.length > 26) {
         let cut = rest.lastIndexOf(' ', 26)
         if (cut < 12) cut = 26
-        result.push(this.makeGlyphs(rest.slice(0, cut)))
+        pushLine(rest.slice(0, cut))
         rest = rest.slice(cut).replace(/^\s+/, '')
       }
-      result.push(this.makeGlyphs(rest))
+      pushLine(rest)
     })
-    return result.slice(-18)
-  },
-  limitConversation(value) {
-    const text = String(value || '')
-    const maxChars = 520
-    return text.length > maxChars ? '…' + text.slice(-(maxChars - 1)) : text
+    return lines.map((line) => this.makeGlyphs(line))
   },
   updateConversationLines() {
     this.conversationLines = this.makeConversationLines(this.conversation)
