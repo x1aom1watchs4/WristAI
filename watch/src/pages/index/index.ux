@@ -181,7 +181,7 @@ export default {
   updateQueryGlyphs() { this.queryGlyphs = this.makeGlyphs(this.query) },
   makeConversationLines(value) {
     // Bound rendered nodes: each Cyrillic glyph creates a separate image element.
-    const maxVisibleLines = 96
+    const maxVisibleLines = 48
     const lines = []
     const pushLine = (line) => {
       if (lines.length >= maxVisibleLines) lines.shift()
@@ -209,7 +209,7 @@ export default {
   appendConversationLines(value) {
     const added = this.makeConversationLines(value)
     const combined = this.conversationLines.concat(added)
-    this.conversationLines = combined.length > 96 ? combined.slice(combined.length - 96) : combined
+    this.conversationLines = combined.length > 48 ? combined.slice(combined.length - 48) : combined
     this.scrollChatToBottom()
   },
   scrollChatToBottom() {
