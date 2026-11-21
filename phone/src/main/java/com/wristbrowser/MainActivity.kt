@@ -116,14 +116,19 @@ class MainActivity : ComponentActivity() {
                 if (responseCode !in 200..299) {
                     val detail = try {
                         val error = JSONObject(responseText).optJSONObject("error")
-                        val message = error?.optString("message")?.takeIf { it.isNotBlank() }
+                        val message = error?.optString("message")?.takeIf { it.isNotBlank() && it != "null" }
                         val metadata = error?.optJSONObject("metadata")
                         val provider = metadata?.optString("provider_name")?.takeIf { it.isNotBlank() && it != "null" }
                         val raw = metadata?.optString("raw")?.takeIf { it.isNotBlank() && it != "null" }
-                        listOfNotNull(message, provider?.let { "Provider: " + it }, raw?.let { "Details: " + it.take(500) })
+                        val errorType = metadata?.optString("error_type")?.takeIf { it.isNotBlank() && it != "null" }
+                        listOfNotNull(message, errorType?.let { "Type: " + it }, provider?.let { "Provider: " + it }, raw?.let { "Details: " + it.take(500) })
                             .joinToString(" · ")
                     } catch (_: Exception) { null }
-                    throw IllegalStateException(detail?.takeIf { it.isNotBlank() } ?: "OpenRouter HTTP $responseCode")
+                    val fallbackBody = responseText.trim().takeIf { it.isNotBlank() }?.take(700)
+                    throw IllegalStateException(
+                        detail?.takeIf { it.isNotBlank() }
+                            ?: "OpenRouter HTTP $responseCode" + (fallbackBody?.let { ": $it" } ?: "")
+                    )
                 }
                 val json = JSONObject(responseText)
                 val message = json.optJSONArray("choices")?.optJSONObject(0)?.optJSONObject("message")
