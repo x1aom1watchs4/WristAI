@@ -121,7 +121,7 @@ export default {
       }
       const answer = this.chunks.join('').trim()
       if (answer) {
-        this.conversation = this.limitConversation(this.conversation + '\n\nИИ:\n' + answer)
+        this.conversation = this.conversation + '\n\nИИ:\n' + answer
         this.updateConversationLines()
       }
       this.status = answer ? 'Ответ получен' : 'ИИ вернул пустой ответ'
@@ -225,7 +225,7 @@ export default {
     if (this.requestPending) { this.status = 'Подожди завершения предыдущего ответа'; return }
     if (prompt.length > 4000) { this.status = 'Вопрос слишком длинный (максимум 4000 символов)'; return }
     this.requestPending = true
-    this.conversation = this.limitConversation(this.conversation + '\n\nТы:\n' + prompt)
+    this.conversation = this.conversation + '\n\nТы:\n' + prompt
     this.updateConversationLines()
     this.query = ''
     this.keyboardVisible = false
