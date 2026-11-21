@@ -52,7 +52,7 @@ export default {
     conversation: 'WristAI готов. Введи вопрос — телефон отправит его в Gemini и вернёт ответ сюда.',
     conversationLines: [], sendGlyphs: [], chatReady: false,
     query: '', queryGlyphs: [], keyboardVisible: true, keyboardLanguage: 'ru', keyboardMode: 'letters',
-    transferId: '', expectedChunks: 0, chunks: [], received: 0, requestPending: false,
+    transferId: '', expectedChunks: 0, chunks: [], receivedChunks: [], received: 0, requestPending: false,
     ruRow1: ['Й','Ц','У','К','Е','Н','Г','Ш','Щ','З','Х'],
     ruRow2: ['Ф','Ы','В','А','П','Р','О','Л','Д','Ж','Э'],
     ruRow3: ['Я','Ч','С','М','И','Т','Ь','Б','Ю','Ё','Ъ'],
@@ -82,33 +82,60 @@ export default {
     catch (error) { this.status = 'Не удалось прочитать ответ'; return }
     if (!message || !message.type) return
     if (message.type === 'page_start') {
-      this.transferId = message.id || ''
-      this.expectedChunks = Number(message.chunks || 0)
+      const transferId = String(message.id || '')
+      const expectedChunks = Number(message.chunks)
+      if (!transferId || !isFinite(expectedChunks) || expectedChunks < 0 || Math.floor(expectedChunks) !== expectedChunks) {
+        this.status = 'Некорректные данные начала передачи'
+        return
+      }
+      this.transferId = transferId
+      this.expectedChunks = expectedChunks
       this.chunks = []
+      this.receivedChunks = []
       this.received = 0
       this.status = 'ИИ отправляет ответ…'
     } else if (message.type === 'page_chunk') {
       if (message.id !== this.transferId) return
       const index = Number(message.index)
-      if (index < 0 || index >= this.expectedChunks) return
-      this.chunks[index] = this.base64ToUtf8(message.textBase64 || '')
+      if (!isFinite(index) || Math.floor(index) !== index || index < 0 || index >= this.expectedChunks) return
+      if (this.receivedChunks[index]) return
+      const decoded = this.base64ToUtf8(message.textBase64 || '')
+      this.chunks[index] = decoded
+      this.receivedChunks[index] = true
       this.received++
       if (this.received % 4 === 0 || this.received === this.expectedChunks) {
         this.status = 'Получаем ответ: ' + this.received + '/' + this.expectedChunks
       }
     } else if (message.type === 'page_end') {
       if (message.id !== this.transferId) return
-      const answer = this.chunks.join('').trim()
+      const completedTransferId = this.transferId
       this.requestPending = false
+      if (this.received !== this.expectedChunks) {
+        this.status = 'Ответ получен не полностью: ' + this.received + '/' + this.expectedChunks
+        this.chunks = []
+        this.receivedChunks = []
+        this.transferId = ''
+        this.expectedChunks = 0
+        this.sendCommand('page_ack', {id: completedTransferId, ok: false})
+        return
+      }
+      const answer = this.chunks.join('').trim()
       if (answer) {
         this.conversation = this.conversation + '\n\nИИ:\n' + answer
         this.updateConversationLines()
       }
       this.status = answer ? 'Ответ получен' : 'ИИ вернул пустой ответ'
       this.chunks = []
-      this.sendCommand('page_ack', {id: this.transferId, ok: true})
+      this.receivedChunks = []
+      this.transferId = ''
+      this.expectedChunks = 0
+      this.sendCommand('page_ack', {id: completedTransferId, ok: true})
     } else if (message.type === 'transfer_error') {
       this.requestPending = false
+      this.chunks = []
+      this.receivedChunks = []
+      this.transferId = ''
+      this.expectedChunks = 0
       this.status = message.message || 'Ошибка передачи ответа'
     }
   },
@@ -128,9 +155,11 @@ export default {
       if (position < size) bytes[position++] = ((b & 15) << 4) | (c >> 2)
       if (position < size) bytes[position++] = ((c & 3) << 6) | d
     }
-    let encoded = ''
-    for (let i = 0; i < bytes.length; i++) encoded += '%' + ('0' + bytes[i].toString(16)).slice(-2)
-    try { return decodeURIComponent(encoded) } catch (error) { return '' }
+    const encodedParts = new Array(bytes.length)
+    for (let i = 0; i < bytes.length; i++) {
+      encodedParts[i] = '%' + ('0' + bytes[i].toString(16)).slice(-2)
+    }
+    try { return decodeURIComponent(encodedParts.join('')) } catch (error) { return '' }
   },
   sendCommand(type, extra) {
     if (!connection) connection = interconnect.instance()
