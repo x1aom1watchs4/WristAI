@@ -151,8 +151,8 @@ export default {
   makeConversationLines(value) {
     const result = []
     let source = String(value || '').replace(/\r/g, '')
-    if (source.length > 520) {
-      source = '…\n' + source.slice(-520).replace(/^\s+/, '')
+    if (source.length > 180) {
+      source = '…\n' + source.slice(-180).replace(/^\s+/, '')
     }
     const paragraphs = source.split('\n')
     paragraphs.forEach((paragraph) => {
@@ -169,7 +169,7 @@ export default {
     return result
   },
   updateConversationLines() {
-    if (this.conversation.length > 3000) this.conversation = '…\n' + this.conversation.slice(-3000).replace(/^\s+/, '')
+    if (this.conversation.length > 1000) this.conversation = '…\n' + this.conversation.slice(-1000).replace(/^\s+/, '')
     this.conversationLines = this.makeConversationLines(this.conversation)
     this.scrollChatToBottom()
   },
