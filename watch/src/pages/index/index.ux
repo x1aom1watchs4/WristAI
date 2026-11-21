@@ -4,10 +4,7 @@
     <text class="status">{{status}}</text>
     <list id="chatList" class="chat" if="{{!keyboardVisible}}" bounces="true">
       <list-item class="conversationLine" for="{{line in conversationLines}}">
-        <div class="conversationGlyph" for="{{item in line}}">
-          <image if="{{item.image}}" class="conversationImage" src="{{item.image}}" />
-          <text if="{{!item.image}}" class="conversationPlain">{{item.char}}</text>
-        </div>
+        <text class="conversationText">{{line}}</text>
       </list-item>
     </list>
     <div class="composer" @click="showKeyboard"><text class="prompt">{{query || 'Нажми, чтобы задать вопрос ИИ'}}</text></div>
@@ -152,18 +149,18 @@ export default {
   updateQueryGlyphs() { this.queryGlyphs = this.makeGlyphs(this.query) },
   makeConversationLines(value) {
     const result = []
-    let source = String(value || '').replace(/\r/g, '')
+    const source = String(value || '').replace(/\r/g, '')
     const paragraphs = source.split('\n')
     paragraphs.forEach((paragraph) => {
       let rest = paragraph
-      if (!rest) { result.push([]); return }
+      if (!rest) { result.push(''); return }
       while (rest.length > 26) {
         let cut = rest.lastIndexOf(' ', 26)
         if (cut < 12) cut = 26
-        result.push(this.makeGlyphs(rest.slice(0, cut)))
+        result.push(rest.slice(0, cut))
         rest = rest.slice(cut).replace(/^\s+/, '')
       }
-      result.push(this.makeGlyphs(rest))
+      result.push(rest)
     })
     return result
   },
@@ -204,9 +201,7 @@ export default {
 .status { color:#9eb2c4; font-size:14px; height:22px; }
 .chat { width:100%; height:230px; min-height:230px; flex-shrink:0; margin-top:8px; margin-bottom:8px; background-color:#182633; border-radius:14px; padding:12px; box-sizing:border-box; }
 .conversationLine { width:100%; height:22px; min-height:22px; flex-direction:row; align-items:center; flex-shrink:0; }
-.conversationGlyph { width:14px; height:22px; flex-direction:row; align-items:center; justify-content:center; flex-shrink:0; }
-.conversationImage { width:14px; height:18px; }
-.conversationPlain { color:#f1f5f9; font-size:15px; text-align:center; }
+.conversationText { width:100%; color:#f1f5f9; font-size:15px; text-align:left; }
 .composer { width:100%; min-height:42px; background-color:#263746; border-radius:12px; padding:10px; box-sizing:border-box; }
 .prompt { color:#ffffff; font-size:17px; }
 .actions { width:100%; flex-direction:row; justify-content:space-between; margin-top:7px; }
